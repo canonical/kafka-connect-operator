@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+"""Charmed Machine Operator for Apache Kafka Connect."""
+
+import logging
+
+import ops
+from charms.data_platform_libs.v0.data_models import TypedCharmBase
+from ops import (
+    CollectStatusEvent,
+    StatusBase,
+)
+
+from core.models import GlobalState
+from core.structured_config import CharmConfig
+from events.kafka import KafkaHandler
+from literals import (
+    CHARM_KEY,
+    SUBSTRATE,
+    DebugLevel,
+    Status,
+    Substrates,
+)
+from managers.config import ConfigManager
+from workload import Workload
+
+logger = logging.getLogger(__name__)
+
+
+class ConnectCharm(TypedCharmBase[CharmConfig]):
+    """Charmed Operator for Apache Kafka Connect."""
+
+    config_type = CharmConfig
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.name = CHARM_KEY
+        self.substrate: Substrates = SUBSTRATE
+        self.pending_inactive_statuses: list[Status] = []
+
+        self.workload = Workload()
+        self.state = GlobalState(self, substrate=SUBSTRATE)
+        self.config_manager = ConfigManager(
+            state=self.state, workload=self.workload, config=self.config
+        )
+
+        self.framework.observe(getattr(self.on, "install"), self._on_install)
+        self.framework.observe(getattr(self.on, "start"), self._on_start)
+        self.framework.observe(getattr(self.on, "remove"), self._on_remove)
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
+        self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+
+        self.kafka = KafkaHandler(self)
+
+    def _on_install(self, _) -> None:
+        """Handler for `install` event."""
+        if not self.workload.install():
+            self._set_status(Status.SNAP_NOT_INSTALLED)
+            return
+
+    def _on_start(self, _) -> None:
+        if not self.state.kafka_client.relation:
+            self._set_status(Status.MISSING_KAFKA)
+
+    def _on_remove(self, _) -> None:
+        """Handler for `stop` event."""
+        self.workload.stop()
+
+    def _set_status(self, key: Status) -> None:
+        """Sets charm status."""
+        status: StatusBase = key.value.status
+        log_level: DebugLevel = key.value.log_level
+
+        getattr(logger, log_level.lower())(status.message)
+        self.pending_inactive_statuses.append(key)
+
+    def _on_collect_status(self, event: CollectStatusEvent):
+        """Handler for `collect-status` event."""
+        for status in self.pending_inactive_statuses + [Status.ACTIVE]:
+            event.add_status(status.value.status)
+
+
+if __name__ == "__main__":
+    ops.main(ConnectCharm)  # pyright: ignore[reportCallIssue]

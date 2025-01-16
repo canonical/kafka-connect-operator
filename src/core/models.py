@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+"""Collection of state objects for the Kafka Connect charm relations, apps and units."""
+
+from typing import TYPE_CHECKING
+
+from charms.data_platform_libs.v0.data_interfaces import (
+    Data,
+    DataPeerData,
+    DataPeerUnitData,
+    KafkaRequirerData,
+    RequirerData,
+)
+from ops import Object
+from ops.model import Application, Relation, Unit
+
+from literals import (
+    DEFAULT_SECURITY_MECHANISM,
+    KAFKA_CLIENT_REL,
+    PEER_REL,
+    SUBSTRATE,
+    TOPICS,
+    Substrates,
+)
+
+if TYPE_CHECKING:
+    from charm import ConnectCharm
+
+
+class RelationState:
+    """Relation state object."""
+
+    def __init__(
+        self,
+        relation: Relation | None,
+        data_interface: Data,
+        component: Unit | Application | None,
+        substrate: Substrates = SUBSTRATE,
+    ):
+        self.relation = relation
+        self.data_interface = data_interface
+        self.component = component
+        self.substrate = substrate
+        self.relation_data = self.data_interface.as_dict(self.relation.id) if self.relation else {}
+
+    def __bool__(self) -> bool:
+        """Boolean evaluation based on the existence of self.relation."""
+        try:
+            return bool(self.relation)
+        except AttributeError:
+            return False
+
+    def update(self, items: dict[str, str]) -> None:
+        """Writes to relation_data."""
+        delete_fields = [key for key in items if not items[key]]
+        update_content = {k: items[k] for k in items if k not in delete_fields}
+        self.relation_data.update(update_content)
+        for field in delete_fields:
+            del self.relation_data[field]
+
+
+class KafkaClientState(RelationState):
+    """State collection metadata for kafka-client relation."""
+
+    def __init__(
+        self,
+        relation: Relation | None,
+        data_interface: RequirerData,
+    ):
+        super().__init__(relation, data_interface, None)
+
+    @property
+    def username(self) -> str:
+        """Returns the Kafka client username."""
+        if not self.relation:
+            return ""
+
+        return self.relation_data.get("username", "")
+
+    @property
+    def password(self) -> str:
+        """Returns the Kafka client password."""
+        if not self.relation:
+            return ""
+
+        return self.relation_data.get("password", "")
+
+    @property
+    def bootstrap_servers(self) -> str:
+        """Returns Kafka bootstrap servers."""
+        if not self.relation:
+            return ""
+
+        return self.relation_data.get("endpoints", "")
+
+    @property
+    def tls_enabled(self) -> bool:
+        """Returns True if TLS is enabled."""
+        if not self.relation:
+            return False
+
+        tls = self.relation_data.get("tls")
+
+        if tls is not None and tls != "disabled":
+            return True
+
+        return False
+
+    @property
+    def security_protocol(self) -> str:
+        """Returns the security protocol."""
+        return "SASL_PLAINTEXT" if not self.tls_enabled else "SASL_SSL"
+
+    @property
+    def security_mechanism(self) -> str:
+        """Returns the security mechanism in use."""
+        return DEFAULT_SECURITY_MECHANISM
+
+
+class WorkerUnitState(RelationState):
+    """State collection metadata for a single Kafka Connect worker unit."""
+
+    def __init__(
+        self,
+        relation: Relation | None,
+        data_interface: DataPeerUnitData,
+        component: Unit,
+    ):
+        super().__init__(relation, data_interface, component)
+        self.data_interface = data_interface
+        self.unit = component
+
+    @property
+    def unit_id(self) -> int:
+        """The id of the unit from the unit name."""
+        return int(self.unit.name.split("/")[1])
+
+    @property
+    def internal_address(self) -> str:
+        """The IPv4 address or FQDN of the worker unit."""
+        addr = ""
+        if self.substrate == "vm":
+            for key in ["hostname", "ip", "private-address"]:
+                if addr := self.relation_data.get(key, ""):
+                    break
+
+        if self.substrate == "k8s":
+            addr = f"{self.unit.name.split('/')[0]}-{self.unit_id}.{self.unit.name.split('/')[0]}-endpoints"
+
+        return addr
+
+
+class GlobalState(Object):
+    """State model for the Kafka Connect charm."""
+
+    def __init__(self, charm: "ConnectCharm", substrate: Substrates):
+        super().__init__(parent=charm, key="charm_state")
+        self.substrate = substrate
+        self.config = charm.config
+
+        self.peer_app_interface = DataPeerData(self.model, relation_name=PEER_REL)
+        self.peer_unit_interface = DataPeerUnitData(self.model, relation_name=PEER_REL)
+        self.kafka_client_interface = KafkaRequirerData(
+            self.model,
+            relation_name=KAFKA_CLIENT_REL,
+            topic=TOPICS["offset"],
+            extra_user_roles="admin",
+        )
+
+    @property
+    def kafka_client(self) -> KafkaClientState:
+        """Returns state of the kafka-client relation."""
+        return KafkaClientState(
+            self.model.get_relation(KAFKA_CLIENT_REL), self.kafka_client_interface
+        )
+
+    @property
+    def worker_unit(self) -> WorkerUnitState:
+        """Returns state of the peer unit relation."""
+        return WorkerUnitState(
+            self.model.get_relation(PEER_REL),
+            self.peer_unit_interface,
+            component=self.model.unit,
+        )
