@@ -24,7 +24,6 @@ class LogLevel(str, Enum):
 class CharmConfig(BaseConfigModel):
     """Manager for the structured configuration."""
 
-    rest_protocol: str
     rest_port: int
 
     @validator("*", pre=True)

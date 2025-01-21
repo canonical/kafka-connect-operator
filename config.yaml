@@ -2,11 +2,6 @@
 # See LICENSE file for licensing details.
 
 options:
-  rest_protocol:
-    description: |
-      Protocol used for Apache Kafka Connect REST API endpoint.
-    type: string
-    default: http
   rest_port:
     description: |
       Port used for Apache Kafka Connect REST API endpoint.

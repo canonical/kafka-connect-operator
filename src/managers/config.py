@@ -114,7 +114,7 @@ class ConfigManager:
     @property
     def listeners(self) -> str:
         """Listener(s) for the REST API endpoint."""
-        return f"{self.config.rest_protocol}://{self.state.worker_unit.internal_address}:{self.config.rest_port}"
+        return f"{self.state.rest_protocol}://{self.state.worker_unit.internal_address}:{self.config.rest_port}"
 
     @property
     def properties(self) -> list[str]:

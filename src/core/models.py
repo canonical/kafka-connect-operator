@@ -97,7 +97,7 @@ class KafkaClientState(RelationState):
 
     @property
     def tls_enabled(self) -> bool:
-        """Returns True if TLS is enabled."""
+        """Returns True if TLS is enabled on Kafka-Client relation."""
         if not self.relation:
             return False
 
@@ -184,3 +184,14 @@ class GlobalState(Object):
             self.peer_unit_interface,
             component=self.model.unit,
         )
+    
+    @property
+    def tls_enabled(self) -> bool:
+        """Returns True if TLS is enabled."""
+        # TODO: fix after tls support is added
+        return False 
+
+    @property
+    def rest_protocol(self) -> str:
+        """Returns the REST API protocol, either `http` or `https`."""
+        return "http" if not self.tls_enabled else "https"
