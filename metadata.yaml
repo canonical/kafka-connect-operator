@@ -36,3 +36,7 @@ resources:
   connect-plugin:
     type: file
     filename: "plugin.tar.gz"
+    description: |
+      Path to a local TAR archive containing JAR file(s) with the implementation of one or more connectors, transformers, or converters.
+      This TAR archive will be added to Kafka Connect `plugin.path`.
+      The archive should not contain any libraries provided by the Kafka Connect runtime.
