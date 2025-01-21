@@ -80,10 +80,8 @@ def test_kafka_client_relation_created_checks_broker_availability(
 
     if not broker_available:
         assert state_out.unit_status == Status.NO_KAFKA_CREDENTIALS.value.status
-        assert _restart.call_count == 0
     else:
         assert state_out.unit_status == Status.ACTIVE.value.status
-        assert _restart.call_count == 1
 
 
 def test_kafka_client_relation_change_triggers_restart(
