@@ -59,7 +59,6 @@ class KafkaHandler(Object):
             event.defer()
             return
 
-        self._restart_worker()
         self.charm._set_status(Status.ACTIVE)
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
@@ -67,7 +66,7 @@ class KafkaHandler(Object):
         current_config = set(self.charm.workload.read(CONFIG_PATH))
         diff = set(self.charm.config_manager.properties) ^ current_config
 
-        if len(diff) == 0:
+        if not diff:
             return
 
         self._restart_worker()
