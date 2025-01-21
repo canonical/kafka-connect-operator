@@ -32,7 +32,6 @@ DEFAULT_API_PORT = 8083
 
 CONFIG_PATH = f"/var/snap/{SNAP_NAME}/current/etc/connect/connect-distributed.properties"
 SERVICE_NAME = "connect-distributed"
-SERVICE_PATH = f"/etc/systemd/system/{SNAP_NAME}.{SERVICE_NAME}.service"
 
 TOPICS = {"offset": "connect-offset", "config": "connect-config", "status": "connect-status"}
 REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
