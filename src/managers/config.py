@@ -73,7 +73,7 @@ class ConfigManager:
             f"{prefix_}security.protocol={self.state.kafka_client.security_protocol}",
             f'{prefix_}sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{username}" password="{password}";',
         ]
-    
+
     def set_properties(self) -> None:
         """Writes all Kafka Connect config properties to the `connect-distributed.properties` path."""
         self.workload.write(content="\n".join(self.properties) + "\n", path=CONFIG_PATH)

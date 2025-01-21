@@ -184,12 +184,12 @@ class GlobalState(Object):
             self.peer_unit_interface,
             component=self.model.unit,
         )
-    
+
     @property
     def tls_enabled(self) -> bool:
         """Returns True if TLS is enabled."""
         # TODO: fix after tls support is added
-        return False 
+        return False
 
     @property
     def rest_protocol(self) -> str:
