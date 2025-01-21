@@ -68,13 +68,15 @@ class ConfigManager:
         """Returns a list of key=value configuration entries for a given kafka client."""
         prefix_ = "" if mode == "worker" else f"{mode}."
 
-        properties = [
+        return [
             f"{prefix_}sasl.mechanism={self.state.kafka_client.security_mechanism}",
             f"{prefix_}security.protocol={self.state.kafka_client.security_protocol}",
             f'{prefix_}sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{username}" password="{password}";',
         ]
-
-        return properties
+    
+    def set_properties(self) -> None:
+        """Writes all Kafka Connect config properties to the `connect-distributed.properties` path."""
+        self.workload.write(content="\n".join(self.properties) + "\n", path=CONFIG_PATH)
 
     @property
     def converter_properties(self) -> list[str]:
@@ -132,7 +134,3 @@ class ConfigManager:
         )
 
         return properties
-
-    def set_properties(self) -> None:
-        """Writes all Kafka Connect config properties to the `connect-distributed.properties` path."""
-        self.workload.write(content="\n".join(self.properties) + "\n", path=CONFIG_PATH)
