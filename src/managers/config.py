@@ -55,14 +55,6 @@ class ConfigManager:
         """Returns key=value configuration entry for a given converter."""
         return f"{converter_mode}.converter={converter_class}"
 
-    @property
-    def converter_properties(self) -> list[str]:
-        """Returns the list of configuration for all converters."""
-        properties = []
-        for converter in ("key", "value"):
-            properties.append(self._add_converter(converter_mode=converter))
-        return properties
-
     def _add_topic(
         self, mode: str, topic_name: InternalTopics, replication_factor: int = -1
     ) -> list[str]:
@@ -71,6 +63,26 @@ class ConfigManager:
             f"{mode}.storage.topic={topic_name}",
             f"{mode}.storage.replication.factor={replication_factor}",
         ]
+
+    def _add_client(self, mode: ClientModes, username: str, password: str) -> list[str]:
+        """Returns a list of key=value configuration entries for a given kafka client."""
+        prefix_ = "" if mode == "worker" else f"{mode}."
+
+        properties = [
+            f"{prefix_}sasl.mechanism={self.state.kafka_client.security_mechanism}",
+            f"{prefix_}security.protocol={self.state.kafka_client.security_protocol}",
+            f'{prefix_}sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{username}" password="{password}";',
+        ]
+
+        return properties
+
+    @property
+    def converter_properties(self) -> list[str]:
+        """Returns the list of configuration for all converters."""
+        properties = []
+        for converter in ("key", "value"):
+            properties.append(self._add_converter(converter_mode=converter))
+        return properties
 
     @property
     def topic_properties(self) -> list[str]:
@@ -84,18 +96,6 @@ class ConfigManager:
                     replication_factor=REPLICATION_FACTOR,
                 )
             )
-        return properties
-
-    def _add_client(self, mode: ClientModes, username: str, password: str) -> list[str]:
-        """Returns a list of key=value configuration entries for a given kafka client."""
-        prefix_ = "" if mode == "worker" else f"{mode}."
-
-        properties = [
-            f"{prefix_}sasl.mechanism={self.state.kafka_client.security_mechanism}",
-            f"{prefix_}security.protocol={self.state.kafka_client.security_protocol}",
-            f'{prefix_}sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{username}" password="{password}";',
-        ]
-
         return properties
 
     @property
