@@ -29,10 +29,10 @@ class KafkaHandler(Object):
     def __init__(self, charm: "ConnectCharm") -> None:
         super().__init__(charm, "kafka_client")
         self.charm: "ConnectCharm" = charm
-        self.state = charm.state
+        self.context = charm.context
 
-        self.kafka_manager = KafkaManager(state=self.state, workload=charm.workload)
-        self.event_handler = KafkaRequirerEventHandlers(charm, self.state.kafka_client_interface)
+        self.kafka_manager = KafkaManager(context=self.context, workload=charm.workload)
+        self.event_handler = KafkaRequirerEventHandlers(charm, self.context.kafka_client_interface)
 
         self.framework.observe(
             self.charm.on[KAFKA_CLIENT_REL].relation_created, self._on_relation_created
@@ -49,7 +49,7 @@ class KafkaHandler(Object):
 
     def _on_update_status(self, _):
         """Handler for `update-status` event."""
-        if not self.state.kafka_client.relation:
+        if not self.context.kafka_client.relation:
             self.charm._set_status(Status.MISSING_KAFKA)
 
     def _on_relation_created(self, event: RelationCreatedEvent) -> None:

@@ -13,7 +13,7 @@ from ops import (
     StatusBase,
 )
 
-from core.models import GlobalState
+from core.models import Context
 from core.structured_config import CharmConfig
 from events.kafka import KafkaHandler
 from literals import (
@@ -41,9 +41,9 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.pending_inactive_statuses: list[Status] = []
 
         self.workload = Workload()
-        self.state = GlobalState(self, substrate=SUBSTRATE)
+        self.context = Context(self, substrate=SUBSTRATE)
         self.config_manager = ConfigManager(
-            state=self.state, workload=self.workload, config=self.config
+            context=self.context, workload=self.workload, config=self.config
         )
 
         self.framework.observe(getattr(self.on, "install"), self._on_install)
@@ -61,7 +61,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
             return
 
     def _on_start(self, _) -> None:
-        if not self.state.kafka_client.relation:
+        if not self.context.kafka_client.relation:
             self._set_status(Status.MISSING_KAFKA)
 
     def _on_remove(self, _) -> None:

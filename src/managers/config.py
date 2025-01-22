@@ -7,7 +7,7 @@
 import logging
 from typing import cast
 
-from core.models import GlobalState
+from core.models import Context
 from core.structured_config import CharmConfig
 from core.workload import WorkloadBase
 from literals import (
@@ -35,16 +35,16 @@ class ConfigManager:
 
     config: CharmConfig
     workload: WorkloadBase
-    state: GlobalState
+    context: Context
 
     def __init__(
         self,
-        state: GlobalState,
+        context: Context,
         workload: WorkloadBase,
         config: CharmConfig,
         current_version: str = "",
     ):
-        self.state = state
+        self.context = context
         self.workload = workload
         self.config = config
         self.current_version = current_version
@@ -69,8 +69,8 @@ class ConfigManager:
         prefix_ = "" if mode == "worker" else f"{mode}."
 
         return [
-            f"{prefix_}sasl.mechanism={self.state.kafka_client.security_mechanism}",
-            f"{prefix_}security.protocol={self.state.kafka_client.security_protocol}",
+            f"{prefix_}sasl.mechanism={self.context.kafka_client.security_mechanism}",
+            f"{prefix_}security.protocol={self.context.kafka_client.security_protocol}",
             f'{prefix_}sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{username}" password="{password}";',
         ]
 
@@ -103,8 +103,8 @@ class ConfigManager:
     @property
     def client_properties(self) -> list[str]:
         """Returns the list of properties for all client modes."""
-        username = self.state.kafka_client.username
-        password = self.state.kafka_client.password
+        username = self.context.kafka_client.username
+        password = self.context.kafka_client.password
 
         properties = []
 
@@ -116,14 +116,14 @@ class ConfigManager:
     @property
     def listeners(self) -> str:
         """Listener(s) for the REST API endpoint."""
-        return f"{self.state.rest_protocol}://{self.state.worker_unit.internal_address}:{self.config.rest_port}"
+        return f"{self.context.rest_protocol}://{self.context.worker_unit.internal_address}:{self.config.rest_port}"
 
     @property
     def properties(self) -> list[str]:
         """Returns all properties necessary for starting Kafka Connect service."""
         properties = (
             [
-                f"bootstrap.servers={self.state.kafka_client.bootstrap_servers}",
+                f"bootstrap.servers={self.context.kafka_client.bootstrap_servers}",
                 f"group.id={GROUP_ID}",
                 f"listeners={self.listeners}",
             ]

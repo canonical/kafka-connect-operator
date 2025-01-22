@@ -2,7 +2,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Collection of state objects for the Kafka Connect charm relations, apps and units."""
+"""Collection of context objects for the Kafka Connect charm relations, apps and units."""
 
 from typing import TYPE_CHECKING
 
@@ -29,8 +29,8 @@ if TYPE_CHECKING:
     from charm import ConnectCharm
 
 
-class RelationState:
-    """Relation state object."""
+class RelationContext:
+    """Relation context object."""
 
     def __init__(
         self,
@@ -61,8 +61,8 @@ class RelationState:
             del self.relation_data[field]
 
 
-class KafkaClientState(RelationState):
-    """State collection metadata for kafka-client relation."""
+class KafkaClientContext(RelationContext):
+    """Context collection metadata for kafka-client relation."""
 
     def __init__(
         self,
@@ -119,8 +119,8 @@ class KafkaClientState(RelationState):
         return DEFAULT_SECURITY_MECHANISM
 
 
-class WorkerUnitState(RelationState):
-    """State collection metadata for a single Kafka Connect worker unit."""
+class WorkerUnitContext(RelationContext):
+    """Context collection metadata for a single Kafka Connect worker unit."""
 
     def __init__(
         self,
@@ -152,11 +152,11 @@ class WorkerUnitState(RelationState):
         return addr
 
 
-class GlobalState(Object):
-    """State model for the Kafka Connect charm."""
+class Context(Object):
+    """Context model for the Kafka Connect charm."""
 
     def __init__(self, charm: "ConnectCharm", substrate: Substrates):
-        super().__init__(parent=charm, key="charm_state")
+        super().__init__(parent=charm, key="charm_context")
         self.substrate = substrate
         self.config = charm.config
 
@@ -170,16 +170,16 @@ class GlobalState(Object):
         )
 
     @property
-    def kafka_client(self) -> KafkaClientState:
-        """Returns state of the kafka-client relation."""
-        return KafkaClientState(
+    def kafka_client(self) -> KafkaClientContext:
+        """Returns context of the kafka-client relation."""
+        return KafkaClientContext(
             self.model.get_relation(KAFKA_CLIENT_REL), self.kafka_client_interface
         )
 
     @property
-    def worker_unit(self) -> WorkerUnitState:
-        """Returns state of the peer unit relation."""
-        return WorkerUnitState(
+    def worker_unit(self) -> WorkerUnitContext:
+        """Returns context of the peer unit relation."""
+        return WorkerUnitContext(
             self.model.get_relation(PEER_REL),
             self.peer_unit_interface,
             component=self.model.unit,

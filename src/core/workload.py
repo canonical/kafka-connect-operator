@@ -2,7 +2,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Supporting objects for Kafka charm state."""
+"""Workload base interface definition."""
 
 import re
 from abc import ABC, abstractmethod

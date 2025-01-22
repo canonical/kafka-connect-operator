@@ -8,7 +8,7 @@ import logging
 import socket
 from contextlib import closing
 
-from core.models import GlobalState
+from core.models import Context
 from core.workload import WorkloadBase
 
 logger = logging.getLogger(__name__)
@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 class KafkaManager:
     """Manager for handling Kafka cluster functions."""
 
-    def __init__(self, state: GlobalState, workload: WorkloadBase):
-        self.state = state
+    def __init__(self, context: Context, workload: WorkloadBase):
+        self.context = context
         self.workload = workload
 
     def _check_socket(self, host: str, port: int) -> bool:
@@ -37,14 +37,16 @@ class KafkaManager:
 
     def health_check(self) -> bool:
         """Checks whether relation to Kafka cluster is healthy or not."""
-        if not self.state.kafka_client.relation:
+        if not self.context.kafka_client.relation:
             return False
 
-        if not self.state.kafka_client.bootstrap_servers:
+        if not self.context.kafka_client.bootstrap_servers:
             return False
 
         # checks whether Apache Kafka cluster is accessible
-        for host, port in self._parse_bootstrap_servers(self.state.kafka_client.bootstrap_servers):
+        for host, port in self._parse_bootstrap_servers(
+            self.context.kafka_client.bootstrap_servers
+        ):
             if not self._check_socket(host, port):
                 return False
 
