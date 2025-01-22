@@ -32,6 +32,8 @@ DEFAULT_API_PORT = 8083
 
 CONFIG_PATH = f"/var/snap/{SNAP_NAME}/current/etc/connect/connect-distributed.properties"
 SERVICE_NAME = "connect-distributed"
+PLUGIN_RESOURCE_KEY = "connect-plugin"
+PLUGIN_PATH = f"/var/snap/{SNAP_NAME}/common/var/lib/connect/plugins/"
 
 TOPICS = {"offset": "connect-offset", "config": "connect-config", "status": "connect-status"}
 REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
@@ -67,5 +69,6 @@ class Status(Enum):
     NO_KAFKA_CREDENTIALS = StatusLevel(
         WaitingStatus("Waiting for Kafka cluster credentials"), "DEBUG"
     )
+    SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("Worker service is not running"), "WARNING")
 
     ACTIVE = StatusLevel(ActiveStatus(), "DEBUG")

@@ -35,7 +35,7 @@ requires:
 resources:
   connect-plugin:
     type: file
-    filename: "plugin.tar.gz"
+    filename: "plugin.tar"
     description: |
       Path to a local TAR archive containing JAR file(s) with the implementation of one or more connectors, transformers, or converters.
       This TAR archive will be added to Kafka Connect `plugin.path`.

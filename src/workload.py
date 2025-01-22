@@ -37,11 +37,6 @@ class Workload(WorkloadBase):
         self.kafka = snap.SnapCache()[SNAP_NAME]
         self.service = SERVICE_NAME
 
-    @property
-    @override
-    def container_can_connect(self) -> bool:
-        return True  # Always True on VM
-
     @override
     def start(self) -> None:
         try:
@@ -142,6 +137,19 @@ class Workload(WorkloadBase):
         bin_str = " ".join(bin_args)
         command = f"{opts_str} {SNAP_NAME}.{bin_keyword} {bin_str}"
         return self.exec(command)
+
+    @override
+    def mkdir(self, path: str):
+        self.exec(["mkdir", path])
+
+    @override
+    def rmdir(self, path: str):
+        self.exec(["rm", "-r", path])
+
+    @property
+    @override
+    def container_can_connect(self) -> bool:
+        return True  # Always True on VM
 
     @property
     @override

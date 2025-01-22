@@ -118,6 +118,17 @@ class KafkaClientContext(RelationContext):
         """Returns the security mechanism in use."""
         return DEFAULT_SECURITY_MECHANISM
 
+    @property
+    def ready(self) -> bool:
+        """Checks if Kafka client relation is ready to use."""
+        if not self.relation:
+            return False
+
+        if not self.bootstrap_servers:
+            return False
+
+        return True
+
 
 class WorkerUnitContext(RelationContext):
     """Context collection metadata for a single Kafka Connect worker unit."""
@@ -195,3 +206,11 @@ class Context(Object):
     def rest_protocol(self) -> str:
         """Returns the REST API protocol, either `http` or `https`."""
         return "http" if not self.tls_enabled else "https"
+
+    @property
+    def ready_to_start(self) -> bool:
+        """Checks if all conditions for starting the service are met."""
+        if not self.kafka_client.ready:
+            return False
+
+        return True

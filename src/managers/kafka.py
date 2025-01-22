@@ -37,10 +37,7 @@ class KafkaManager:
 
     def health_check(self) -> bool:
         """Checks whether relation to Kafka cluster is healthy or not."""
-        if not self.context.kafka_client.relation:
-            return False
-
-        if not self.context.kafka_client.bootstrap_servers:
+        if not self.context.kafka_client.ready:
             return False
 
         # checks whether Apache Kafka cluster is accessible

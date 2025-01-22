@@ -82,6 +82,16 @@ class WorkloadBase(ABC):
         """
         ...
 
+    @abstractmethod
+    def mkdir(self, path: str):
+        """Creates a new directory at the provided path."""
+        ...
+
+    @abstractmethod
+    def rmdir(self, path: str):
+        """Removes the directory at the provided path."""
+        ...
+
     def get_version(self) -> str:
         """Get the workload version."""
         if not self.active:

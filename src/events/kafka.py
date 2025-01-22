@@ -13,7 +13,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 from ops.charm import RelationBrokenEvent, RelationChangedEvent, RelationCreatedEvent
 from ops.framework import Object
 
-from literals import CONFIG_PATH, KAFKA_CLIENT_REL, Status
+from literals import KAFKA_CLIENT_REL, Status
 from managers.kafka import KafkaManager
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class KafkaHandler(Object):
-    """..."""
+    """Handler for events on Kafka cluster relation."""
 
     def __init__(self, charm: "ConnectCharm") -> None:
         super().__init__(charm, "kafka_client")
@@ -44,14 +44,6 @@ class KafkaHandler(Object):
             self.charm.on[KAFKA_CLIENT_REL].relation_changed, self._on_relation_changed
         )
 
-        self.framework.observe(getattr(self.charm.on, "update_status"), self._on_update_status)
-        # self.framework.observe(self.event_handler.on.topic_created, self.on_topic_requested)
-
-    def _on_update_status(self, _):
-        """Handler for `update-status` event."""
-        if not self.context.kafka_client.relation:
-            self.charm._set_status(Status.MISSING_KAFKA)
-
     def _on_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handler for `kafka-client-relation-created` event."""
         if not self.kafka_manager.health_check():
@@ -59,24 +51,13 @@ class KafkaHandler(Object):
             event.defer()
             return
 
-        self.charm._set_status(Status.ACTIVE)
+        self.charm.on.config_changed.emit()
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handler for `kafka-client-relation-changed` event."""
-        current_config = set(self.charm.workload.read(CONFIG_PATH))
-        diff = set(self.charm.config_manager.properties) ^ current_config
-
-        if not diff:
-            return
-
-        self._restart_worker()
+        self.charm.on.config_changed.emit()
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handler for `kafka-client-relation-broken` event."""
         self.charm._set_status(Status.MISSING_KAFKA)
         self.charm.workload.stop()
-
-    def _restart_worker(self):
-        """Attempts to re-configure and restart the connect worker."""
-        self.charm.config_manager.set_properties()
-        self.charm.workload.restart()
