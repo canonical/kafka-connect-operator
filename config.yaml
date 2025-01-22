@@ -1,0 +1,9 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+options:
+  rest_port:
+    description: |
+      Port used for Apache Kafka Connect REST API endpoint.
+    type: int
+    default: 8083
