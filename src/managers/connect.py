@@ -7,6 +7,7 @@
 import logging
 import os
 from pathlib import Path
+from subprocess import CalledProcessError
 
 from charms.operator_libs_linux.v2 import snap
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
@@ -102,7 +103,11 @@ class ConnectManager:
         Raises:
             SnapError if error occurs or if no pid string found in most recent log
         """
-        java_processes = self.workload.exec(["pidof", "java"])
+        try:
+            java_processes = self.workload.exec(["pidof", "java"])
+        except CalledProcessError:
+            java_processes = ""
+
         logger.debug(f"Java processes: {java_processes}")
 
         for pid in java_processes.split():
