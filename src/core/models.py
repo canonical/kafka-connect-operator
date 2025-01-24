@@ -4,7 +4,9 @@
 
 """Collection of context objects for the Kafka Connect charm relations, apps and units."""
 
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
+from typing_extensions import override
 
 from charms.data_platform_libs.v0.data_interfaces import (
     Data,
@@ -22,6 +24,7 @@ from literals import (
     PEER_REL,
     SUBSTRATE,
     TOPICS,
+    Status,
     Substrates,
 )
 
@@ -29,7 +32,25 @@ if TYPE_CHECKING:
     from charm import ConnectCharm
 
 
-class RelationContext:
+class WithStatus(ABC):
+    """Abstract base mixin class for objects with status."""
+
+    @property
+    @abstractmethod
+    def status(self) -> Status:
+        """Returns status of the object."""
+        ...
+    
+    @property
+    def ready(self) -> bool:
+        """Returns True if the status is Active and False otherwise."""
+        if self.status == Status.ACTIVE:
+            return True
+        
+        return False
+
+
+class RelationContext(WithStatus):
     """Relation context object."""
 
     def __init__(
@@ -119,15 +140,15 @@ class KafkaClientContext(RelationContext):
         return DEFAULT_SECURITY_MECHANISM
 
     @property
-    def ready(self) -> bool:
-        """Checks if Kafka client relation is ready to use."""
+    @override
+    def status(self) -> Status:
         if not self.relation:
-            return False
+            return Status.MISSING_KAFKA
 
         if not self.bootstrap_servers:
-            return False
+            return Status.NO_KAFKA_CREDENTIALS
 
-        return True
+        return Status.ACTIVE
 
 
 class WorkerUnitContext(RelationContext):
@@ -162,8 +183,13 @@ class WorkerUnitContext(RelationContext):
 
         return addr
 
+    @property
+    @override
+    def status(self) -> Status:
+        return Status.ACTIVE
 
-class Context(Object):
+
+class Context(WithStatus, Object):
     """Context model for the Kafka Connect charm."""
 
     def __init__(self, charm: "ConnectCharm", substrate: Substrates):
@@ -208,9 +234,8 @@ class Context(Object):
         return "http" if not self.tls_enabled else "https"
 
     @property
-    def ready_to_start(self) -> bool:
-        """Checks if all conditions for starting the service are met."""
+    def status(self) -> Status:
         if not self.kafka_client.ready:
-            return False
+            return self.kafka_client.status
 
-        return True
+        return Status.ACTIVE

@@ -25,7 +25,7 @@ class ConnectHandler(Object):
     """Handler for events related to Kafka Connect worker."""
 
     def __init__(self, charm: "ConnectCharm") -> None:
-        super().__init__(charm, "kafka_client")
+        super().__init__(charm, "connect-worker")
         self.charm: "ConnectCharm" = charm
         self.context = charm.context
         self.workload = charm.workload
@@ -48,7 +48,10 @@ class ConnectHandler(Object):
             self.connect_manager.get_pid()
             self.charm._set_status(Status.ACTIVE)
         except snap.SnapError:
-            self.charm._set_status(Status.SERVICE_NOT_RUNNING)
+            if self.context.ready:
+                self.charm._set_status(Status.SERVICE_NOT_RUNNING)
+            else:
+                self.charm._set_status(self.context.status)
 
     def _on_config_changed(self, event: ConfigChangedEvent):
         """Handler for `config-changed` event."""
@@ -65,7 +68,8 @@ class ConnectHandler(Object):
         if not diff and not resource_path:
             return
 
-        if not self.context.ready_to_start:
+        if not self.context.ready:
+            self.charm._set_status(self.context.status)
             event.defer()
             return
 
