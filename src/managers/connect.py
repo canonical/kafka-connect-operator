@@ -6,10 +6,8 @@
 
 import logging
 import os
+import time
 from pathlib import Path
-
-from charms.operator_libs_linux.v2 import snap
-from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from core.models import Context
 from core.workload import WorkloadBase
@@ -104,9 +102,8 @@ class ConnectManager:
         self.workload.restart()
 
         attempts = 5
-        try:
-            for attempt in Retrying(wait=wait_fixed(2), stop=stop_after_attempt(attempts)):
-                with attempt:
-                    self.health_check()
-        except (RetryError, snap.SnapError):
-            logger.warning(f"Failed to get service PID after {attempts} attempts.")
+        for _ in range(attempts):
+            if self.health_check():
+                return
+
+            time.sleep(2)
