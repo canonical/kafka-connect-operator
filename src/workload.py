@@ -7,6 +7,8 @@
 import logging
 import os
 import subprocess
+import socket
+from contextlib import closing
 from typing import Mapping
 
 from charms.operator_libs_linux.v2 import snap
@@ -145,6 +147,12 @@ class Workload(WorkloadBase):
     @override
     def rmdir(self, path: str):
         self.exec(["rm", "-r", path])
+
+    @override
+    def check_socket(self, host: str, port: int) -> bool:
+        """Checks whether an IPv4 socket is healthy or not."""
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            return sock.connect_ex((host, port)) == 0
 
     @property
     @override

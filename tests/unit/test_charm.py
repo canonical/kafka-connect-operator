@@ -68,7 +68,7 @@ def test_kafka_client_relation_created_checks_broker_availability(
     # When
     with (
         patch(
-            "managers.kafka.KafkaManager._check_socket",
+            "workload.Workload.check_socket",
             return_value=broker_available,
         ) as fake_check_socket,
         patch("workload.Workload.restart") as _restart,

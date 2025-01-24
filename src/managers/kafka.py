@@ -21,11 +21,6 @@ class KafkaManager:
         self.context = context
         self.workload = workload
 
-    def _check_socket(self, host: str, port: int) -> bool:
-        """Checks whether an IPv4 socket is healthy or not."""
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-            return sock.connect_ex((host, port)) == 0
-
     def _parse_bootstrap_servers(self, servers) -> list[tuple[str, int]]:
         """Parses bootstrap servers config entry and returns a list of (host, port) tuples."""
         parsed = []
@@ -44,7 +39,7 @@ class KafkaManager:
         for host, port in self._parse_bootstrap_servers(
             self.context.kafka_client.bootstrap_servers
         ):
-            if not self._check_socket(host, port):
+            if not self.workload.check_socket(host, port):
                 return False
 
         return True

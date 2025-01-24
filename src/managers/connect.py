@@ -30,7 +30,7 @@ class ConnectManager:
         self.reload_plugins()
 
     @property
-    def plugins_cache(self):
+    def plugins_cache(self) -> set:
         """Local cache of available plugins, populated using checksums of loaded plugins."""
         return self._plugins_cache
 
@@ -86,7 +86,7 @@ class ConnectManager:
     def load_plugin(self, resource_path: Path):
         """Loads a plugin from a given `resource_path` to the `PLUGIN_PATH` folder, skips if previously loaded."""
         if self._plugin_checksum(resource_path) in self.plugins_cache:
-            logger.warning(f"Plugin {resource_path.name} already loaded, skipping...")
+            logger.debug(f"Plugin {resource_path.name} already loaded, skipping...")
             return
 
         load_path = self._create_plugin_dir(resource_path)
@@ -94,33 +94,8 @@ class ConnectManager:
         self.workload.rmdir(f"{resource_path}")
         self.reload_plugins()
 
-    def get_pid(self) -> int:
-        """Gets pid of a currently active connect-distributed worker snap service.
-
-        Returns:
-            Integer of pid
-
-        Raises:
-            SnapError if error occurs or if no pid string found in most recent log
-        """
-        try:
-            java_processes = self.workload.exec(["pidof", "java"])
-        except CalledProcessError:
-            java_processes = ""
-
-        logger.debug(f"Java processes: {java_processes}")
-
-        for pid in java_processes.split():
-            with open(f"/proc/{pid}/cgroup", "r") as fid:
-                content = "".join(fid.readlines())
-
-                if f"{SNAP_NAME}.{SERVICE_NAME}" in content:
-                    logger.debug(
-                        f"Found Snap service {SERVICE_NAME} for {SNAP_NAME} with PID {pid}"
-                    )
-                    return int(pid)
-
-        raise snap.SnapError(f"Snap {SNAP_NAME} pid not found")
+    def health_check(self):
+        return self.workload.check_socket(self.context.worker_unit.internal_address, self.context.rest_port)
 
     def restart_worker(self):
         """Attempts to restart the connect worker and ensure the service is running."""
@@ -128,8 +103,8 @@ class ConnectManager:
 
         attempts = 5
         try:
-            for attempt in Retrying(wait=wait_fixed(1), stop=stop_after_attempt(attempts)):
+            for attempt in Retrying(wait=wait_fixed(2), stop=stop_after_attempt(attempts)):
                 with attempt:
-                    self.get_pid()
+                    self.health_check()
         except (RetryError, snap.SnapError):
             logger.warning(f"Failed to get service PID after {attempts} attempts.")

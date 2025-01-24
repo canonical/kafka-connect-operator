@@ -46,7 +46,7 @@ class ConnectHandler(Object):
     def _update_status(self, event: EventBase):
         """Handler for `update-status` event."""
         try:
-            self.connect_manager.get_pid()
+            self.connect_manager.health_check()
             self.charm._set_status(Status.ACTIVE)
         except snap.SnapError:
             if self.context.ready:

@@ -227,6 +227,11 @@ class Context(WithStatus, Object):
         """Returns True if TLS is enabled."""
         # TODO: fix after tls support is added
         return False
+    
+    @property
+    def rest_port(self) -> int:
+        """Returns the REST API port."""
+        return self.config.rest_port
 
     @property
     def rest_protocol(self) -> str:
