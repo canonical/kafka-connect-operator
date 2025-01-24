@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import tempfile
 
 import pytest
@@ -38,6 +39,7 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
         ops_test.model.deploy(
             kafka_connect_charm,
             application_name=APP_NAME,
+            resources={PLUGIN_RESOURCE_KEY: "./tests/integration/resources/FakeResource.tar"},
             num_units=1,
             series="jammy",
         ),
@@ -66,7 +68,7 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
 
 
 @pytest.mark.abort_on_fail
-async def test_add_plugin(ops_test: OpsTest, kafka_connect_charm):
+async def test_add_plugin(ops_test: OpsTest):
     """Checks attach-resource functionality using Aiven JDBC connector and ensures JDBC source/sink connector plugins are added."""
     with tempfile.TemporaryDirectory() as temp_dir:
         plugin_path = f"{temp_dir}/jdbc-plugin.tar"
@@ -74,11 +76,14 @@ async def test_add_plugin(ops_test: OpsTest, kafka_connect_charm):
         download_file(JDBC_CONNECTOR_DOWNLOAD_LINK, plugin_path)
         logging.info("Download finished successfully.")
         # attach resource
-        await ops_test.model.applications[APP_NAME].refresh(
-            path=kafka_connect_charm, resources={PLUGIN_RESOURCE_KEY: plugin_path}
+        ops_test.model.applications[APP_NAME].attach_resource(
+            PLUGIN_RESOURCE_KEY,
+            file_name=os.path.basename(plugin_path),
+            file_obj=open(plugin_path, "rb"),
         )
 
-    await asyncio.sleep(90)
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30, timeout=600)
 
     response = await make_connect_api_request(ops_test, method="GET", endpoint="connector-plugins")
     assert response.status_code == 200
