@@ -6,8 +6,8 @@
 
 import logging
 import os
-import subprocess
 import socket
+import subprocess
 from contextlib import closing
 from typing import Mapping
 

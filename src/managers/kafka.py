@@ -5,8 +5,6 @@
 """Manager for handling operations on Kafka cluster."""
 
 import logging
-import socket
-from contextlib import closing
 
 from core.models import Context
 from core.workload import WorkloadBase

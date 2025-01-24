@@ -6,7 +6,6 @@
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
-from typing_extensions import override
 
 from charms.data_platform_libs.v0.data_interfaces import (
     Data,
@@ -17,6 +16,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from ops import Object
 from ops.model import Application, Relation, Unit
+from typing_extensions import override
 
 from literals import (
     DEFAULT_SECURITY_MECHANISM,
@@ -40,13 +40,13 @@ class WithStatus(ABC):
     def status(self) -> Status:
         """Returns status of the object."""
         ...
-    
+
     @property
     def ready(self) -> bool:
         """Returns True if the status is Active and False otherwise."""
         if self.status == Status.ACTIVE:
             return True
-        
+
         return False
 
 
@@ -227,7 +227,7 @@ class Context(WithStatus, Object):
         """Returns True if TLS is enabled."""
         # TODO: fix after tls support is added
         return False
-    
+
     @property
     def rest_port(self) -> int:
         """Returns the REST API port."""
@@ -239,6 +239,7 @@ class Context(WithStatus, Object):
         return "http" if not self.tls_enabled else "https"
 
     @property
+    @override
     def status(self) -> Status:
         if not self.kafka_client.ready:
             return self.kafka_client.status

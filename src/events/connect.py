@@ -8,9 +8,9 @@ import logging
 from typing import TYPE_CHECKING
 
 from charms.operator_libs_linux.v2 import snap
+from ops import ModelError
 from ops.charm import ConfigChangedEvent, InstallEvent
 from ops.framework import EventBase, Object
-from ops import ModelError
 
 from literals import CONFIG_PATH, PLUGIN_RESOURCE_KEY, Status
 from managers.connect import ConnectManager
@@ -63,7 +63,9 @@ class ConnectHandler(Object):
         except RuntimeError:
             logger.error(f"Resource {PLUGIN_RESOURCE_KEY} not defined in the charm build.")
         except (NameError, ModelError):
-            logger.warning(f"Resource {PLUGIN_RESOURCE_KEY} not found or could not be downloaded, skipping plugin loading.")
+            logger.warning(
+                f"Resource {PLUGIN_RESOURCE_KEY} not found or could not be downloaded, skipping plugin loading."
+            )
 
         current_config = set(self.charm.workload.read(CONFIG_PATH))
         diff = set(self.charm.config_manager.properties) ^ current_config

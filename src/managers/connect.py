@@ -7,14 +7,13 @@
 import logging
 import os
 from pathlib import Path
-from subprocess import CalledProcessError
 
 from charms.operator_libs_linux.v2 import snap
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from core.models import Context
 from core.workload import WorkloadBase
-from literals import GROUP, PLUGIN_PATH, SERVICE_NAME, SNAP_NAME, USER
+from literals import GROUP, PLUGIN_PATH, USER
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +93,11 @@ class ConnectManager:
         self.workload.rmdir(f"{resource_path}")
         self.reload_plugins()
 
-    def health_check(self):
-        return self.workload.check_socket(self.context.worker_unit.internal_address, self.context.rest_port)
+    def health_check(self) -> bool:
+        """Checks the health of connect service by pinging the Connect API."""
+        return self.workload.check_socket(
+            self.context.worker_unit.internal_address, self.context.rest_port
+        )
 
     def restart_worker(self):
         """Attempts to restart the connect worker and ensure the service is running."""
