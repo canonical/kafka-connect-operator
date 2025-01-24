@@ -107,3 +107,5 @@ class ConnectManager:
                 return
 
             time.sleep(2)
+
+        logger.warning(f"Failed to ping the service after {attempts} attempts.")
