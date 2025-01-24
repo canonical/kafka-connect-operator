@@ -13,6 +13,8 @@ from helpers import (
     KAFKA_CHANNEL,
     MYSQL_APP,
     MYSQL_CHANNEL,
+    S3_CONNECTOR_CLASS,
+    S3_CONNECTOR_LINK,
     build_mysql_db_init_queries,
     download_file,
     get_unit_ipv4_address,
@@ -173,3 +175,31 @@ async def test_task_is_running(ops_test: OpsTest):
 
     assert status_response.status_code == 200
     assert status_response.json().get("state") == "RUNNING"
+
+
+@pytest.mark.abort_on_fail
+async def test_add_another_plugin(ops_test: OpsTest):
+    """Checks attaching new plugins work as expected, preserving the old ones."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        plugin_path = f"{temp_dir}/jdbc-plugin.tar"
+        logging.info(f"Downloading S3 connectors from {S3_CONNECTOR_LINK}...")
+        download_file(S3_CONNECTOR_LINK, plugin_path)
+        logging.info("Download finished successfully.")
+        # attach resource
+        ops_test.model.applications[APP_NAME].attach_resource(
+            PLUGIN_RESOURCE_KEY,
+            file_name=os.path.basename(plugin_path),
+            file_obj=open(plugin_path, "rb"),
+        )
+
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30, timeout=600)
+
+    response = await make_connect_api_request(ops_test, method="GET", endpoint="connector-plugins")
+    assert response.status_code == 200
+
+    connector_classes = [c.get("class") for c in response.json()]
+
+    assert S3_CONNECTOR_CLASS in connector_classes
+    assert JDBC_SOURCE_CONNECTOR_CLASS in connector_classes
+    assert JDBC_SINK_CONNECTOR_CLASS in connector_classes
