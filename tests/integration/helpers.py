@@ -4,11 +4,19 @@
 
 import re
 import socket
+import ssl
 from contextlib import closing
+from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import requests
 import yaml
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.x509 import Certificate, load_pem_x509_certificate
+from cryptography.x509.extensions import SubjectAlternativeName
+from cryptography.x509.oid import ExtensionOID
 from ops.model import Unit
 from pytest_operator.plugin import OpsTest
 
@@ -29,6 +37,13 @@ S3_CONNECTOR_LINK = "https://github.com/Aiven-Open/cloud-storage-connectors-for-
 S3_CONNECTOR_CLASS = "io.aiven.kafka.connect.s3.AivenKafkaConnectS3SinkConnector"
 
 
+@dataclass
+class CommandResult:
+    return_code: int | None
+    stdout: str
+    stderr: str
+
+
 def check_socket(host: str | None, port: int) -> bool:
     """Checks whether IPv4 socket is up or not."""
     if host is None:
@@ -36,6 +51,16 @@ def check_socket(host: str | None, port: int) -> bool:
 
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         return sock.connect_ex((host, port)) == 0
+
+
+async def run_command_on_unit(
+    ops_test: OpsTest, unit: Unit, command: str | list[str]
+) -> CommandResult:
+    """Runs a command on a given unit and returns the result."""
+    command_args = command.split() if isinstance(command, str) else command
+    return_code, stdout, stderr = await ops_test.juju("ssh", f"{unit.name}", *command_args)
+
+    return CommandResult(return_code=return_code, stdout=stdout, stderr=stderr)
 
 
 async def get_unit_ipv4_address(ops_test: OpsTest, unit: Unit) -> str | None:
@@ -113,7 +138,7 @@ def download_file(url: str, dst_path: str):
 def build_mysql_db_init_queries(
     test_db_host: str, test_db_user: str, test_db_pass: str, test_db_name: str
 ) -> list[str]:
-    """..."""
+    """Returns a list of queries to initiate a test MySQL database with 1 table and 3 sample entries."""
     raw = f"""CREATE DATABASE {test_db_name};
     CREATE USER '{test_db_user}'@'{test_db_host}' IDENTIFIED BY '{test_db_pass}';
     GRANT ALL PRIVILEGES ON {test_db_name}.* TO '{test_db_user}'@'{test_db_host}' WITH GRANT OPTION;
@@ -131,3 +156,30 @@ def build_mysql_db_init_queries(
 
     queries = [query.strip().replace("\n", " ") for query in raw.split(";")]
     return [query for query in queries if query]
+
+
+async def get_certificate(
+    ops_test: OpsTest, unit: Unit | None = None, port: int = DEFAULT_API_PORT
+) -> Certificate:
+    """Gets TLS certificate of a particular unit using a socket.
+
+    Args:
+        ops_test (OpsTest): OpsTest object
+        unit (Unit | None, optional): Unit used to establish the socket; if not supplied, uses the first unit in the Kafka Connect application `APP_NAME`.
+        port (int, optional): Socket port. Defaults to DEFAULT_API_PORT.
+
+    Returns:
+        Certificate: Unit's certificate used on the socket.
+    """
+    target_unit = ops_test.model.applications[APP_NAME].units[0] if unit is None else unit
+    unit_ip = await get_unit_ipv4_address(ops_test, target_unit)
+
+    pem = ssl.get_server_certificate((f"{unit_ip}", port))
+    return load_pem_x509_certificate(str.encode(pem), default_backend())
+
+
+def extract_sans(cert: Certificate) -> list[str]:
+    """Returns the list of Subject Alternative Names (SANs) of a given certificate."""
+    ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+    val = cast(SubjectAlternativeName, ext.value)
+    return val.get_values_for_type(x509.DNSName)

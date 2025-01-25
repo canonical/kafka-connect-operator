@@ -13,7 +13,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 from ops.charm import RelationBrokenEvent, RelationChangedEvent, RelationCreatedEvent
 from ops.framework import Object
 
-from literals import KAFKA_CLIENT_REL, Status
+from literals import KAFKA_CLIENT_REL, Status, TLSLiterals
 from managers.kafka import KafkaManager
 
 if TYPE_CHECKING:
@@ -55,6 +55,19 @@ class KafkaHandler(Object):
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handler for `kafka-client-relation-changed` event."""
+        if self.context.kafka_client.tls_enabled and self.context.kafka_client.broker_ca:
+            # Import broker CA to truststore if not done.
+            if not self.context.worker_unit.tls.truststore_password:
+                self.charm.context.worker_unit.update(
+                    {TLSLiterals.TRUSTSTORE_PASSWORD: self.charm.workload.generate_password()}
+                )
+
+            self.charm.tls_manager.import_cert(
+                TLSLiterals.BROKER_CA,
+                f"{TLSLiterals.BROKER_CA}.pem",
+                cert_content=self.context.kafka_client.broker_ca,
+            )
+
         self.charm.on.config_changed.emit()
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:

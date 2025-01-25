@@ -11,7 +11,7 @@ from ops import ModelError
 from ops.charm import ConfigChangedEvent, InstallEvent
 from ops.framework import EventBase, Object
 
-from literals import CONFIG_PATH, PLUGIN_RESOURCE_KEY, Status
+from literals import CONFIG_PATH, PEER_REL, PLUGIN_RESOURCE_KEY, Status
 from managers.connect import ConnectManager
 
 if TYPE_CHECKING:
@@ -35,6 +35,8 @@ class ConnectHandler(Object):
         self.framework.observe(getattr(self.charm.on, "update_status"), self._update_status)
         self.framework.observe(getattr(self.charm.on, "config_changed"), self._on_config_changed)
         self.framework.observe(getattr(self.charm.on, "install"), self._on_install)
+
+        self.framework.observe(self.charm.on[PEER_REL].relation_changed, self._on_config_changed)
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handler for `install` event."""

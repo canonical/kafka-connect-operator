@@ -14,9 +14,11 @@ from literals import (
     CONFIG_PATH,
     DEFAULT_CONVERTER_CLASS,
     GROUP_ID,
+    KEYSTORE_PATH,
     PLUGIN_PATH,
     REPLICATION_FACTOR,
     TOPICS,
+    TRUSTSTORE_PATH,
     ClientModes,
     Converters,
     InternalTopics,
@@ -102,8 +104,8 @@ class ConfigManager:
         return properties
 
     @property
-    def client_properties(self) -> list[str]:
-        """Returns the list of properties for all client modes."""
+    def client_auth_properties(self) -> list[str]:
+        """Returns the list of authentication properties for all client modes."""
         username = self.context.kafka_client.username
         password = self.context.kafka_client.password
 
@@ -115,9 +117,40 @@ class ConfigManager:
         return properties
 
     @property
-    def listeners(self) -> str:
-        """Listener(s) for the REST API endpoint."""
-        return f"{self.context.rest_protocol}://{self.context.worker_unit.internal_address}:{self.context.rest_port}"
+    def client_tls_properties(self) -> list[str]:
+        """Returns the TLS properties for client if TLS is enabled."""
+        if not self.context.kafka_client.tls_enabled:
+            return []
+
+        return [
+            f"ssl.truststore.location={TRUSTSTORE_PATH}",
+            f"ssl.truststore.password={self.context.worker_unit.tls.truststore_password}",
+        ]
+
+    @property
+    def rest_listener_properties(self) -> list[str]:
+        """Returns Listener properties for the REST API endpoint."""
+        return [
+            f"listeners={self.context.rest_protocol}://{self.context.worker_unit.internal_address}:{self.context.rest_port}",
+            f"rest.advertised.listener={self.context.rest_protocol}",
+            f"rest.advertised.host.name={self.context.worker_unit.internal_address}",
+            f"rest.advertised.host.port={self.context.rest_port}",
+        ]
+
+    @property
+    def rest_tls_properties(self) -> list[str]:
+        """Returns TLS properties for the REST API endpoint."""
+        if not self.context.peer_workers.tls_enabled:
+            return []
+
+        return [
+            "listeners.https.ssl.client.authentication=requested",
+            f"listeners.https.ssl.truststore.location={TRUSTSTORE_PATH}",
+            f"listeners.https.ssl.truststore.password={self.context.worker_unit.tls.truststore_password}",
+            f"listeners.https.ssl.keystore.location={KEYSTORE_PATH}",
+            f"listeners.https.ssl.keystore.password={self.context.worker_unit.tls.keystore_password}",
+            "listeners.https.ssl.endpoint.identification.algorithm=HTTPS",
+        ]
 
     @property
     def properties(self) -> list[str]:
@@ -126,11 +159,13 @@ class ConfigManager:
             [
                 f"bootstrap.servers={self.context.kafka_client.bootstrap_servers}",
                 f"group.id={GROUP_ID}",
-                f"listeners={self.listeners}",
                 f"plugin.path={PLUGIN_PATH}",
             ]
             + DEFAULT_CONFIG_OPTIONS.split("\n")
-            + self.client_properties
+            + self.rest_listener_properties
+            + self.rest_tls_properties
+            + self.client_auth_properties
+            + self.client_tls_properties
             + self.converter_properties
             + self.topic_properties
         )

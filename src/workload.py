@@ -149,6 +149,10 @@ class Workload(WorkloadBase):
         self.exec(["rm", "-r", path])
 
     @override
+    def remove(self, path: str):
+        self.exec(["rm", path])
+
+    @override
     def check_socket(self, host: str, port: int) -> bool:
         """Checks whether an IPv4 socket is healthy or not."""
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
