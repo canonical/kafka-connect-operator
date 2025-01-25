@@ -239,6 +239,11 @@ class Context(WithStatus, Object):
         return "http" if not self.tls_enabled else "https"
 
     @property
+    def rest_uri(self) -> str:
+        """Returns the REST API base URI."""
+        return f"{self.rest_protocol}://{self.worker_unit.internal_address}:{self.rest_port}"
+
+    @property
     @override
     def status(self) -> Status:
         if not self.kafka_client.ready:

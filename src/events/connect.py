@@ -7,7 +7,6 @@
 import logging
 from typing import TYPE_CHECKING
 
-from charms.operator_libs_linux.v2 import snap
 from ops import ModelError
 from ops.charm import ConfigChangedEvent, InstallEvent
 from ops.framework import EventBase, Object
@@ -45,14 +44,12 @@ class ConnectHandler(Object):
 
     def _update_status(self, event: EventBase):
         """Handler for `update-status` event."""
-        try:
-            self.connect_manager.health_check()
+        if self.connect_manager.health_check():
             self.charm._set_status(Status.ACTIVE)
-        except snap.SnapError:
-            if self.context.ready:
-                self.charm._set_status(Status.SERVICE_NOT_RUNNING)
-            else:
-                self.charm._set_status(self.context.status)
+        elif self.context.ready:
+            self.charm._set_status(Status.SERVICE_NOT_RUNNING)
+        else:
+            self.charm._set_status(self.context.status)
 
     def _on_config_changed(self, event: ConfigChangedEvent):
         """Handler for `config-changed` event."""

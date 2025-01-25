@@ -74,5 +74,7 @@ def plugin_resource():
 
 @pytest.fixture(scope="module")
 def active_service():
-    with patch("workload.Workload.check_socket", return_value=True) as patched_get_pid:
-        yield patched_get_pid
+    with patch(
+        "managers.connect.ConnectManager.health_check", return_value=True
+    ) as patched_service:
+        yield patched_service
