@@ -39,6 +39,7 @@ class ConnectHandler(Object):
 
         # instantiate the provider
         self.provider = ConnectProvider(self.charm)
+        self.framework.observe(self.charm.on[PEER_REL].relation_changed, self._on_config_changed)
 
     def _update_status(self, event: EventBase):
         """Handler for `update-status` event."""
@@ -128,8 +129,8 @@ class ConnectHandler(Object):
                     "endpoints": self.context.rest_endpoints,
                     "username": client.username,
                     "password": client.password,
-                    # "tls": self.context.peer_workers.tls_enabled,
-                    # "tls-ca": self.context.worker_unit.tls.ca
+                    "tls": "enabled" if self.context.peer_workers.tls_enabled else "disabled",
+                    "tls-ca": self.context.worker_unit.tls.ca
                 }
             )
 

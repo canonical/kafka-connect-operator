@@ -143,6 +143,11 @@ class WorkloadBase(ABC):
         ...
 
     @abstractmethod
+    def remove(self, path: str):
+        """Removes the file at the provided path."""
+        ...
+
+    @abstractmethod
     def check_socket(self, host: str, port: int) -> bool:
         """Checks whether an IPv4 socket is healthy or not."""
         ...
@@ -150,7 +155,6 @@ class WorkloadBase(ABC):
     @abstractmethod
     def set_environment(self, env_vars: Iterable[str]) -> None:
         """Updates the environment variables with provided iterable of key=value `env_vars`."""
-        ...
 
     def get_version(self) -> str:
         """Get the workload version."""

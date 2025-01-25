@@ -45,6 +45,7 @@ REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
 KAFKA_CLIENT_REL = "kafka-client"
 PEER_REL = "worker"
 CLIENT_REL = "connect-client"
+TLS_REL = "certificates"
 
 # TODO: this should be set using `profile` config option in the future
 LOG_SENSITIVE_OUTPUT = True  # set False for production mode & builds
@@ -55,6 +56,19 @@ Substrates = Literal["vm", "k8s"]
 ClientModes = Literal["worker", "producer", "consumer"]
 Converters = Literal["key", "value"]
 InternalTopics = Literal["offset", "config", "status"]
+
+
+class TLSLiterals:
+    CA = "ca"
+    CHAIN = "chain"
+    CERT = "certificate"
+    CSR = "csr"
+    BROKER_CA = "broker"
+    PRIVATE_KEY = "private-key"
+    KEYSTORE_PASSWORD = "keystore-password"
+    TRUSTSTORE_PASSWORD = "truststore-password"
+    KEYS = {CA, CERT, CSR, CHAIN}
+    SECRETS = [CERT, CSR, PRIVATE_KEY, KEYSTORE_PASSWORD, TRUSTSTORE_PASSWORD]
 
 
 @dataclass

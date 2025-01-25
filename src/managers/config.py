@@ -15,6 +15,7 @@ from literals import (
     DEFAULT_AUTH_CLASS,
     DEFAULT_CONVERTER_CLASS,
     GROUP_ID,
+    PLUGIN_PATH,
     REPLICATION_FACTOR,
     TOPICS,
     ClientModes,
@@ -154,6 +155,17 @@ class ConfigManager:
     def rest_auth_properties(self) -> list[str]:
         """Returns authentication config properties on the REST API endpoint."""
         return [f"rest.extension.classes={DEFAULT_AUTH_CLASS}"]
+    
+    @property
+    def client_tls_properties(self) -> list[str]:
+        """Returns the TLS properties for client if TLS is enabled."""
+        if not self.context.kafka_client.tls_enabled:
+            return []
+
+        return [
+            f"ssl.truststore.location={self.workload.paths.truststore}",
+            f"ssl.truststore.password={self.context.worker_unit.tls.truststore_password}",
+        ]
 
     @property
     def rest_listener_properties(self) -> list[str]:
@@ -166,6 +178,21 @@ class ConfigManager:
         ]
 
     @property
+    def rest_tls_properties(self) -> list[str]:
+        """Returns TLS properties for the REST API endpoint."""
+        if not self.context.peer_workers.tls_enabled:
+            return []
+
+        return [
+            "listeners.https.ssl.client.authentication=requested",
+            f"listeners.https.ssl.truststore.location={self.workload.paths.truststore}",
+            f"listeners.https.ssl.truststore.password={self.context.worker_unit.tls.truststore_password}",
+            f"listeners.https.ssl.keystore.location={self.workload.paths.keystore}",
+            f"listeners.https.ssl.keystore.password={self.context.worker_unit.tls.keystore_password}",
+            "listeners.https.ssl.endpoint.identification.algorithm=HTTPS",
+        ]
+
+    @property
     def properties(self) -> list[str]:
         """Returns all properties necessary for starting Kafka Connect service."""
         properties = (
@@ -175,9 +202,11 @@ class ConfigManager:
                 f"plugin.path={self.workload.paths.plugins}",
             ]
             + DEFAULT_CONFIG_OPTIONS.split("\n")
-            + self.rest_auth_properties
             + self.rest_listener_properties
+            + self.rest_tls_properties
+            + self.rest_auth_properties
             + self.client_auth_properties
+            + self.client_tls_properties
             + self.converter_properties
             + self.topic_properties
         )
