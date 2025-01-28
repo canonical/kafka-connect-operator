@@ -77,7 +77,7 @@ async def test_enable_tls_on_rest_api(ops_test: OpsTest):
 
 async def test_tls_scale_out(ops_test: OpsTest):
     """Checks connect workers scaling functionality with TLS relation."""
-    # await ops_test.model.applications[APP_NAME].add_units(count=2)
+    await ops_test.model.applications[APP_NAME].add_units(count=2)
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
             apps=[APP_NAME], idle_period=30, timeout=600, status="active", wait_for_exact_units=3
