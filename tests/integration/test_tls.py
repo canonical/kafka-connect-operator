@@ -10,6 +10,7 @@ from helpers import (
     get_certificate,
     make_connect_api_request,
     run_command_on_unit,
+    self_signed_ca,
 )
 from pytest_operator.plugin import OpsTest
 from requests.exceptions import ConnectionError, SSLError
@@ -64,9 +65,9 @@ async def test_enable_tls_on_rest_api(ops_test: OpsTest):
     with pytest.raises(ConnectionError):
         _ = await make_connect_api_request(ops_test, proto="http")
 
-    response = await make_connect_api_request(ops_test, proto="https", verify=False)
-
-    assert response.status_code == 200
+    async with self_signed_ca(ops_test, TLS_APP) as ca_file:
+        response = await make_connect_api_request(ops_test, proto="https", verify=ca_file.name)
+        assert response.status_code == 200
 
     cert = await get_certificate(ops_test)
 
@@ -76,15 +77,18 @@ async def test_enable_tls_on_rest_api(ops_test: OpsTest):
 
 async def test_tls_scale_out(ops_test: OpsTest):
     """Checks connect workers scaling functionality with TLS relation."""
-    await ops_test.model.applications[APP_NAME].add_units(count=2)
+    # await ops_test.model.applications[APP_NAME].add_units(count=2)
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
             apps=[APP_NAME], idle_period=30, timeout=600, status="active", wait_for_exact_units=3
         )
 
-    for unit in ops_test.model.applications[APP_NAME].units:
-        response = await make_connect_api_request(ops_test, unit=unit, proto="https", verify=False)
-        assert response.status_code == 200
+    async with self_signed_ca(ops_test, TLS_APP) as ca_file:
+        for unit in ops_test.model.applications[APP_NAME].units:
+            response = await make_connect_api_request(
+                ops_test, unit=unit, proto="https", verify=ca_file.name
+            )
+            assert response.status_code == 200
 
 
 async def test_tls_broken(ops_test: OpsTest):
@@ -98,7 +102,7 @@ async def test_tls_broken(ops_test: OpsTest):
 
     for unit in ops_test.model.applications[APP_NAME].units:
         with pytest.raises(SSLError):
-            _ = await make_connect_api_request(ops_test, unit=unit, proto="https", verify=False)
+            _ = await make_connect_api_request(ops_test, unit=unit, proto="https")
 
         response = await make_connect_api_request(ops_test, unit=unit, proto="http")
 

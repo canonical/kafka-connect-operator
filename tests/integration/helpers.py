@@ -6,7 +6,8 @@ import json
 import re
 import socket
 import ssl
-from contextlib import closing
+import tempfile
+from contextlib import asynccontextmanager, closing
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import PIPE, check_output
@@ -249,3 +250,18 @@ def extract_sans(cert: Certificate) -> list[str]:
     ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
     val = cast(SubjectAlternativeName, ext.value)
     return val.get_values_for_type(x509.DNSName)
+
+
+@asynccontextmanager
+async def self_signed_ca(ops_test: OpsTest, app_name: str):
+    """Returns a context manager with self-signed-certificates operator CA file."""
+    action_name: str = "get-ca-certificate"
+    unit = ops_test.model.applications[app_name].units[0]
+    action = await unit.run_action(action_name=action_name)
+    result = await action.wait()
+    ca = result.results.get("ca-certificate")
+
+    with tempfile.NamedTemporaryFile(mode="w", delete_on_close=False) as ca_file:
+        ca_file.write(ca)
+        ca_file.close()
+        yield ca_file
