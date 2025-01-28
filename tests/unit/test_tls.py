@@ -15,7 +15,8 @@ from charms.tls_certificates_interface.v3.tls_certificates import (
 )
 from ops.testing import Context, PeerRelation, Relation, State
 from src.charm import ConnectCharm
-from src.literals import PEER_REL, TLS_REL, Status, TLSLiterals
+from src.core.models import TLSContext
+from src.literals import PEER_REL, TLS_REL, Status
 from src.managers.tls import TLSManager
 
 logger = logging.getLogger(__name__)
@@ -52,9 +53,9 @@ def test_tls_relation_broken(ctx: Context, base_state: State, is_leader: bool) -
         PEER_REL,
         local_app_data={"tls": "enabled"},
         local_unit_data={
-            TLSLiterals.CA: "ca",
-            TLSLiterals.PRIVATE_KEY: "private-key",
-            TLSLiterals.CERT: "cert",
+            TLSContext.CA: "ca",
+            TLSContext.PRIVATE_KEY: "private-key",
+            TLSContext.CERT: "cert",
         },
     )
     tls_rel = Relation(TLS_REL, TLS_REL)
@@ -66,7 +67,7 @@ def test_tls_relation_broken(ctx: Context, base_state: State, is_leader: bool) -
 
     # Then
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
-    for key in TLSLiterals.KEYS:
+    for key in TLSContext.KEYS:
         assert not peer_rel.local_unit_data.get(key)
 
     if is_leader:
@@ -81,9 +82,9 @@ def test_tls_relation_broken(ctx: Context, base_state: State, is_leader: bool) -
     [
         {},
         {
-            TLSLiterals.PRIVATE_KEY: generate_private_key().decode("utf-8"),
-            TLSLiterals.KEYSTORE_PASSWORD: "password",
-            TLSLiterals.TRUSTSTORE_PASSWORD: "password",
+            TLSContext.PRIVATE_KEY: generate_private_key().decode("utf-8"),
+            TLSContext.KEYSTORE_PASSWORD: "password",
+            TLSContext.TRUSTSTORE_PASSWORD: "password",
         },
     ],
 )
@@ -118,14 +119,14 @@ def test_tls_relation_joined(
     # Then
     assert len(secret_contents) > 0
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
-    assert secret_contents.get(TLSLiterals.PRIVATE_KEY, "")
-    assert secret_contents.get(TLSLiterals.CSR, "")
-    assert secret_contents.get(TLSLiterals.KEYSTORE_PASSWORD, "")
-    assert secret_contents.get(TLSLiterals.TRUSTSTORE_PASSWORD, "")
+    assert secret_contents.get(TLSContext.PRIVATE_KEY, "")
+    assert secret_contents.get(TLSContext.CSR, "")
+    assert secret_contents.get(TLSContext.KEYSTORE_PASSWORD, "")
+    assert secret_contents.get(TLSContext.TRUSTSTORE_PASSWORD, "")
 
     if tls_init_data:
-        assert secret_contents.get(TLSLiterals.KEYSTORE_PASSWORD, "") == "password"
-        assert secret_contents.get(TLSLiterals.TRUSTSTORE_PASSWORD, "") == "password"
+        assert secret_contents.get(TLSContext.KEYSTORE_PASSWORD, "") == "password"
+        assert secret_contents.get(TLSContext.TRUSTSTORE_PASSWORD, "") == "password"
 
 
 @pytest.mark.parametrize("chain", [[], ["cert-1", "cert-2", "cert-3"]])
@@ -142,7 +143,7 @@ def test_tls_certificate_available(ctx: Context, base_state: State, chain) -> No
         PEER_REL,
         PEER_REL,
         local_app_data={"tls": "enabled"},
-        local_unit_data={TLSLiterals.CSR: csr.decode("utf-8")},
+        local_unit_data={TLSContext.CSR: csr.decode("utf-8")},
     )
     tls_rel = Relation(TLS_REL, TLS_REL)
     tls_manager_mock = MagicMock(spec=TLSManager)
@@ -171,10 +172,10 @@ def test_tls_certificate_available(ctx: Context, base_state: State, chain) -> No
     assert tls_manager_mock.set_certificate.call_count == 1
     assert tls_manager_mock.set_chain.call_count == 1
     assert tls_manager_mock.set_server_key.call_count == 1
-    assert peer_rel.local_unit_data.get(TLSLiterals.CERT, "")
-    assert peer_rel.local_unit_data.get(TLSLiterals.CA, "")
-    assert peer_rel.local_unit_data.get(TLSLiterals.CHAIN, "")
-    assert len(json.loads(peer_rel.local_unit_data.get(TLSLiterals.CHAIN, ""))) == len(chain)
+    assert peer_rel.local_unit_data.get(TLSContext.CERT, "")
+    assert peer_rel.local_unit_data.get(TLSContext.CA, "")
+    assert peer_rel.local_unit_data.get(TLSContext.CHAIN, "")
+    assert len(json.loads(peer_rel.local_unit_data.get(TLSContext.CHAIN, ""))) == len(chain)
 
 
 def test_tls_certificate_expiring(ctx: Context, base_state: State, active_service) -> None:
@@ -205,8 +206,8 @@ def test_tls_certificate_expiring(ctx: Context, base_state: State, active_servic
         charm: ConnectCharm = cast(ConnectCharm, mgr.charm)
         charm.context.worker_unit.update(
             items={
-                TLSLiterals.CSR: csr.decode("utf-8"),
-                TLSLiterals.PRIVATE_KEY: private_key.decode("utf-8"),
+                TLSContext.CSR: csr.decode("utf-8"),
+                TLSContext.PRIVATE_KEY: private_key.decode("utf-8"),
             }
         )
         charm.tls._on_certificate_expiring(event)
@@ -219,5 +220,5 @@ def test_tls_certificate_expiring(ctx: Context, base_state: State, active_servic
     # Then
     # TODO: better assertions?
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
-    assert secret_contents.get(TLSLiterals.PRIVATE_KEY) == private_key.decode("utf-8")
-    assert secret_contents.get(TLSLiterals.CSR) != csr.decode("utf-8")
+    assert secret_contents.get(TLSContext.PRIVATE_KEY) == private_key.decode("utf-8")
+    assert secret_contents.get(TLSContext.CSR) != csr.decode("utf-8")

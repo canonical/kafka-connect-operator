@@ -32,7 +32,6 @@ from literals import (
     TOPICS,
     Status,
     Substrates,
-    TLSLiterals,
 )
 
 if TYPE_CHECKING:
@@ -234,33 +233,44 @@ class ConnectClientContext(RelationContext):
 class TLSContext(RelationContext):
     """TLS metadata of a relation."""
 
+    CA = "ca"
+    CHAIN = "chain"
+    CERT = "certificate"
+    CSR = "csr"
+    BROKER_CA = "broker"
+    PRIVATE_KEY = "private-key"
+    KEYSTORE_PASSWORD = "keystore-password"
+    TRUSTSTORE_PASSWORD = "truststore-password"
+    KEYS = {CA, CERT, CSR, CHAIN}
+    SECRETS = [CERT, CSR, PRIVATE_KEY, KEYSTORE_PASSWORD, TRUSTSTORE_PASSWORD]
+
     def __init__(self, relation, data_interface, component, substrate=SUBSTRATE):
         super().__init__(relation, data_interface, component, substrate)
 
     @property
     def private_key(self) -> str:
         """Private key of the TLS relation."""
-        return self.relation_data.get(TLSLiterals.PRIVATE_KEY, "")
+        return self.relation_data.get(self.PRIVATE_KEY, "")
 
     @property
     def csr(self) -> str:
         """Certificate Signing Request (CSR) of the TLS relation."""
-        return self.relation_data.get(TLSLiterals.CSR, "")
+        return self.relation_data.get(self.CSR, "")
 
     @property
     def certificate(self) -> str:
         """The signed certificate from the provider relation."""
-        return self.relation_data.get(TLSLiterals.CERT, "")
+        return self.relation_data.get(self.CERT, "")
 
     @property
     def ca(self) -> str:
         """The CA used to sign the certificate."""
-        return self.relation_data.get(TLSLiterals.CA, "")
+        return self.relation_data.get(self.CA, "")
 
     @property
     def chain(self) -> list[str]:
         """The chain used to sign unit cert."""
-        full_chain = json.loads(self.relation_data.get("chain", "null")) or []
+        full_chain = json.loads(self.relation_data.get(self.CHAIN, "null")) or []
         # to avoid adding certificate to truststore if self-signed
         clean_chain: set[str] = set(full_chain) - {self.certificate, self.ca}
 
@@ -269,12 +279,12 @@ class TLSContext(RelationContext):
     @property
     def keystore_password(self) -> str:
         """The keystore password."""
-        return self.relation_data.get(TLSLiterals.KEYSTORE_PASSWORD, "")
+        return self.relation_data.get(self.KEYSTORE_PASSWORD, "")
 
     @property
     def truststore_password(self) -> str:
         """The truststore password."""
-        return self.relation_data.get(TLSLiterals.TRUSTSTORE_PASSWORD, "")
+        return self.relation_data.get(self.TRUSTSTORE_PASSWORD, "")
 
     @property
     @override
@@ -294,7 +304,6 @@ class WorkerUnitContext(RelationContext):
         super().__init__(relation, data_interface, component)
         self.data_interface = data_interface
         self.unit = component
-        self._tls: TLSContext = TLSContext(relation, data_interface, component)
 
     @property
     def unit_id(self) -> int:
@@ -304,7 +313,7 @@ class WorkerUnitContext(RelationContext):
     @property
     def tls(self) -> TLSContext:
         """TLS Context of the worker unit."""
-        return self._tls
+        return TLSContext(self.relation, self.data_interface, self.component)
 
     @property
     def internal_address(self) -> str:
@@ -385,7 +394,7 @@ class Context(WithStatus, Object):
             additional_secret_fields=[PeerWorkersContext.ADMIN_PASSWORD],
         )
         self.peer_unit_interface = DataPeerUnitData(
-            self.model, relation_name=PEER_REL, additional_secret_fields=TLSLiterals.SECRETS
+            self.model, relation_name=PEER_REL, additional_secret_fields=TLSContext.SECRETS
         )
         self.kafka_client_interface = KafkaRequirerData(
             self.model,

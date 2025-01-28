@@ -16,7 +16,7 @@ from charms.tls_certificates_interface.v3.tls_certificates import (
 )
 from ops.framework import Object
 
-from literals import TLS_REL, TLSLiterals
+from literals import TLS_REL
 
 if TYPE_CHECKING:
     from charm import ConnectCharm
@@ -66,24 +66,26 @@ class TLSHandler(Object):
         # generate unit private key if not already created by action
         if not self.unit_tls_context.private_key:
             self.charm.context.worker_unit.update(
-                {TLSLiterals.PRIVATE_KEY: generate_private_key().decode("utf-8")}
+                {self.unit_tls_context.PRIVATE_KEY: generate_private_key().decode("utf-8")}
             )
 
         # generate unit private key if not already created by action
         if not self.unit_tls_context.keystore_password:
             self.charm.context.worker_unit.update(
-                {TLSLiterals.KEYSTORE_PASSWORD: self.charm.workload.generate_password()}
+                {self.unit_tls_context.KEYSTORE_PASSWORD: self.charm.workload.generate_password()}
             )
         if not self.unit_tls_context.truststore_password:
             self.charm.context.worker_unit.update(
-                {TLSLiterals.TRUSTSTORE_PASSWORD: self.charm.workload.generate_password()}
+                {
+                    self.unit_tls_context.TRUSTSTORE_PASSWORD: self.charm.workload.generate_password()
+                }
             )
 
         self._request_certificate()
 
     def _tls_relation_broken(self, _) -> None:
         """Handler for `certificates_relation_broken` event."""
-        self.charm.context.worker_unit.update({key: "" for key in TLSLiterals.KEYS})
+        self.charm.context.worker_unit.update({key: "" for key in self.unit_tls_context.KEYS})
 
         # remove all existing keystores from the unit so we don't preserve certs
         self.tls_manager.remove_stores()
@@ -108,9 +110,9 @@ class TLSHandler(Object):
 
         self.charm.context.worker_unit.update(
             {
-                TLSLiterals.CERT: event.certificate,
-                TLSLiterals.CHAIN: json.dumps(event.chain),
-                TLSLiterals.CA: event.ca,
+                self.unit_tls_context.CERT: event.certificate,
+                self.unit_tls_context.CHAIN: json.dumps(event.chain),
+                self.unit_tls_context.CA: event.ca,
             }
         )
 
@@ -141,7 +143,9 @@ class TLSHandler(Object):
             sans_ip=sans["sans_ip"],
             sans_dns=sans["sans_dns"],
         )
-        self.charm.context.worker_unit.update({TLSLiterals.CSR: csr.decode("utf-8").strip()})
+        self.charm.context.worker_unit.update(
+            {self.unit_tls_context.CSR: csr.decode("utf-8").strip()}
+        )
 
         self.certificates.request_certificate_creation(certificate_signing_request=csr)
 
@@ -168,4 +172,6 @@ class TLSHandler(Object):
             new_certificate_signing_request=new_csr,
         )
 
-        self.charm.context.worker_unit.update({TLSLiterals.CSR: new_csr.decode("utf-8").strip()})
+        self.charm.context.worker_unit.update(
+            {self.unit_tls_context.CSR: new_csr.decode("utf-8").strip()}
+        )

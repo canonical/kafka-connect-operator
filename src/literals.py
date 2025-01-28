@@ -58,19 +58,6 @@ Converters = Literal["key", "value"]
 InternalTopics = Literal["offset", "config", "status"]
 
 
-class TLSLiterals:
-    CA = "ca"
-    CHAIN = "chain"
-    CERT = "certificate"
-    CSR = "csr"
-    BROKER_CA = "broker"
-    PRIVATE_KEY = "private-key"
-    KEYSTORE_PASSWORD = "keystore-password"
-    TRUSTSTORE_PASSWORD = "truststore-password"
-    KEYS = {CA, CERT, CSR, CHAIN}
-    SECRETS = [CERT, CSR, PRIVATE_KEY, KEYSTORE_PASSWORD, TRUSTSTORE_PASSWORD]
-
-
 @dataclass
 class StatusLevel:
     """Status object helper."""
