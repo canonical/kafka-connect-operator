@@ -189,6 +189,29 @@ class WorkerUnitContext(RelationContext):
         return Status.ACTIVE
 
 
+class PeerWorkersContext(RelationContext):
+    """Context collection metadata for Kafka Connect peer relation."""
+
+    ADMIN_USERNAME = "admin"
+    ADMIN_PASSWORD = "admin-password"
+
+    def __init__(self, relation, data_interface):
+        super().__init__(relation, data_interface, None)
+
+    @property
+    def admin_password(self) -> str:
+        """Internal admin user's password."""
+        if not self.relation:
+            return ""
+
+        return self.relation_data.get(self.ADMIN_PASSWORD, "")
+
+    @property
+    @override
+    def status(self) -> Status:
+        return Status.ACTIVE
+
+
 class Context(WithStatus, Object):
     """Context model for the Kafka Connect charm."""
 
@@ -198,6 +221,12 @@ class Context(WithStatus, Object):
         self.config = charm.config
 
         self.peer_app_interface = DataPeerData(self.model, relation_name=PEER_REL)
+        self.peer_unit_interface = DataPeerUnitData(self.model, relation_name=PEER_REL)
+        self.peer_app_interface = DataPeerData(
+            self.model,
+            relation_name=PEER_REL,
+            additional_secret_fields=[PeerWorkersContext.ADMIN_PASSWORD],
+        )
         self.peer_unit_interface = DataPeerUnitData(self.model, relation_name=PEER_REL)
         self.kafka_client_interface = KafkaRequirerData(
             self.model,
@@ -220,6 +249,14 @@ class Context(WithStatus, Object):
             self.model.get_relation(PEER_REL),
             self.peer_unit_interface,
             component=self.model.unit,
+        )
+
+    @property
+    def peer_workers(self) -> PeerWorkersContext:
+        """Returns the context of peer app relation."""
+        return PeerWorkersContext(
+            self.model.get_relation(PEER_REL),
+            self.peer_app_interface,
         )
 
     @property

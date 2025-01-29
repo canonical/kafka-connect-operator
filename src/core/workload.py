@@ -5,6 +5,8 @@
 """Workload base interface definition."""
 
 import re
+import secrets
+import string
 from abc import ABC, abstractmethod
 
 from ops.pebble import Layer
@@ -119,3 +121,10 @@ class WorkloadBase(ABC):
     def container_can_connect(self) -> bool:
         """Flag to check if workload container can connect."""
         ...
+
+    @staticmethod
+    def generate_password(length: int = 32) -> str:
+        """Creates randomized string of arbitrary `length` (default is 32) for use as app passwords."""
+        return "".join(
+            [secrets.choice(string.ascii_letters + string.digits) for _ in range(length)]
+        )

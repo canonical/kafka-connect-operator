@@ -11,8 +11,10 @@ import requests
 import yaml
 from ops.model import Unit
 from pytest_operator.plugin import OpsTest
+from requests.auth import HTTPBasicAuth
 
-from literals import DEFAULT_API_PORT
+from core.models import PeerWorkersContext
+from literals import DEFAULT_API_PORT, PASSWORDS_PATH
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -66,12 +68,28 @@ async def check_connect_endpoints_status(
     return status
 
 
+async def get_admin_password(ops_test: OpsTest, unit: Unit) -> str:
+    """Get admin user's password of a unit by reading credentials file."""
+    res = await run_command_on_unit(ops_test, unit, f"sudo cat {PASSWORDS_PATH}")
+    raw = res.stdout.strip().split("\n")
+
+    if not raw:
+        raise Exception(f"Unable to read the credentials file on unit {unit.name}.")
+
+    for line in raw:
+        if line.startswith(PeerWorkersContext.ADMIN_USERNAME):
+            return line.split(":")[-1].strip()
+
+    raise Exception(f"Admin user not defined in the credentials file on unit {unit.name}.")
+
+
 async def make_connect_api_request(
     ops_test: OpsTest,
     unit: Unit | None = None,
     method: str = "GET",
     endpoint: str = "",
     proto: str = "http",
+    auth_enabled: bool = True,
     verbose: bool = True,
     **kwargs,
 ) -> requests.Response:
@@ -83,6 +101,7 @@ async def make_connect_api_request(
         method (str, optional): Request method. Defaults to "GET".
         endpoint (str, optional): Connect API endpoint. Defaults to "".
         proto (str, optional): Connect API Protocol: "http" or "https". Defaults to "http".
+        auth_enabled (bool, optional): Whether should use authentication on the endpoint, defaults to True.
         verbose (bool, optional): Enable verbose logging. Defaults to True.
         kwargs: Keyword arguments which will be passed to `requests.request` method.
 
@@ -94,10 +113,16 @@ async def make_connect_api_request(
     unit_ip = await get_unit_ipv4_address(ops_test, target_unit)
     url = f"{proto}://{unit_ip}:{DEFAULT_API_PORT}/{endpoint}"
 
-    response = requests.request(method, url, **kwargs)
+    admin_password = await get_admin_password(ops_test, unit=target_unit)
+
+    auth = (
+        HTTPBasicAuth(PeerWorkersContext.ADMIN_USERNAME, admin_password) if auth_enabled else None
+    )
+
+    response = requests.request(method, url, auth=auth, **kwargs)
 
     if verbose:
-        print(f"{method} - {url}: {response.json()}")
+        print(f"{method} - {url}: {response.content}")
 
     return response
 

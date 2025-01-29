@@ -4,11 +4,14 @@
 
 import dataclasses
 import logging
-from unittest.mock import patch
+from typing import cast
+from unittest.mock import MagicMock, patch
 
 import pytest
-from ops.testing import Context, Relation, State
-from src.literals import KAFKA_CLIENT_REL, SUBSTRATE, Status
+from ops.testing import Context, PeerRelation, Relation, State
+from src.charm import ConnectCharm
+from src.core.models import PeerWorkersContext
+from src.literals import KAFKA_CLIENT_REL, PEER_REL, SUBSTRATE, Status
 
 logger = logging.getLogger(__name__)
 
@@ -114,3 +117,42 @@ def test_kafka_client_relation_broken(
 
     # Then
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
+
+
+@pytest.mark.parametrize("admin_password", ["", "password"])
+def test_enable_auth(
+    ctx: Context, base_state: State, kafka_client_rel: dict, active_service, admin_password
+) -> None:
+    """Checks `enable_auth` functionality on service startup."""
+    # Given
+    kafka_rel = Relation(KAFKA_CLIENT_REL, KAFKA_CLIENT_REL, remote_app_data=kafka_client_rel)
+    peer_rel = PeerRelation(PEER_REL, PEER_REL)
+    state_in = dataclasses.replace(base_state, relations=[kafka_rel, peer_rel])
+    auth_manager_mock = MagicMock()
+
+    # When
+    with (
+        ctx(ctx.on.config_changed(), state_in) as mgr,
+        patch("workload.Workload.read"),
+        patch("workload.Workload.restart") as _restart,
+    ):
+        charm: ConnectCharm = cast(ConnectCharm, mgr.charm)
+        charm.auth_manager = auth_manager_mock
+        if admin_password:
+            charm.context.peer_workers.update({PeerWorkersContext.ADMIN_PASSWORD: admin_password})
+
+        state_out = mgr.run()
+
+    secret_contents = {
+        k: v for secret in state_out.secrets for k, v in secret.latest_content.items()
+    }
+
+    # Then
+    assert _restart.call_count == 1
+    assert state_out.unit_status == Status.ACTIVE.value.status
+    assert auth_manager_mock.update.call_count == 1
+
+    if admin_password:
+        assert secret_contents.get(PeerWorkersContext.ADMIN_PASSWORD) == admin_password
+    else:
+        assert secret_contents.get(PeerWorkersContext.ADMIN_PASSWORD, "")

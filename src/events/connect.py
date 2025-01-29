@@ -60,7 +60,7 @@ class ConnectHandler(Object):
         except RuntimeError:
             logger.error(f"Resource {PLUGIN_RESOURCE_KEY} not defined in the charm build.")
         except (NameError, ModelError):
-            logger.warning(
+            logger.debug(
                 f"Resource {PLUGIN_RESOURCE_KEY} not found or could not be downloaded, skipping plugin loading."
             )
 
@@ -75,6 +75,26 @@ class ConnectHandler(Object):
             event.defer()
             return
 
-        self.charm.set_properties()
-        self.connect_manager.restart_worker()
+        self.enable_auth()
+        self.charm.config_manager.configure()
+
+        if not self.connect_manager.restart_worker():
+            self.charm._set_status(Status.SERVICE_NOT_RUNNING)
+            event.defer()
+            return
+
         self._update_status(event)
+
+    def enable_auth(self) -> None:
+        """Sets up authentication, including admin user credentials, and initiates internal credential stores on peer worker units."""
+        if self.charm.unit.is_leader() and not self.context.peer_workers.admin_password:
+            # create admin password
+            admin_password = self.workload.generate_password()
+            self.context.peer_workers.update(
+                {self.context.peer_workers.ADMIN_PASSWORD: admin_password}
+            )
+
+        # Update internal credentials store
+        self.charm.auth_manager.update(
+            {self.context.peer_workers.ADMIN_USERNAME: self.context.peer_workers.admin_password}
+        )
