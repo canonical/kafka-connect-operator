@@ -4,6 +4,7 @@
 
 """Event Handler for Kafka Connect related events."""
 
+import datetime
 import logging
 from typing import TYPE_CHECKING
 
@@ -29,6 +30,7 @@ class ConnectHandler(Object):
         self.charm: "ConnectCharm" = charm
         self.context = charm.context
         self.workload = charm.workload
+        self.unit_tls_context = self.context.worker_unit.tls
 
         self.connect_manager = ConnectManager(context=self.context, workload=charm.workload)
 
@@ -44,7 +46,7 @@ class ConnectHandler(Object):
             event.defer()
             return
 
-    def _update_status(self, event: EventBase):
+    def _update_status(self, event: EventBase) -> None:
         """Handler for `update-status` event."""
         if self.connect_manager.health_check():
             self.charm._set_status(Status.ACTIVE)
@@ -53,7 +55,7 @@ class ConnectHandler(Object):
         else:
             self.charm._set_status(self.context.status)
 
-    def _on_config_changed(self, event: ConfigChangedEvent):
+    def _on_config_changed(self, event: ConfigChangedEvent) -> None:
         """Handler for `config-changed` event."""
         resource_path = None
         try:
@@ -65,6 +67,17 @@ class ConnectHandler(Object):
             logger.warning(
                 f"Resource {PLUGIN_RESOURCE_KEY} not found or could not be downloaded, skipping plugin loading."
             )
+
+        if self.context.peer_workers.tls_enabled and self.charm.tls_manager.sans_change_detected:
+            self.charm.tls.certificates.on.certificate_expiring.emit(
+                certificate=self.unit_tls_context.certificate,
+                expiry=datetime.datetime.now().isoformat(),
+            )
+            self.charm.context.worker_unit.update(
+                {self.unit_tls_context.CERT: ""}
+            )  # ensures only single requested new certs, will be replaced on new certificate-available event
+
+            return  # config-changed would be eventually fired on certificate-available, so no need to defer.
 
         current_config = set(self.charm.workload.read(CONFIG_PATH))
         diff = set(self.charm.config_manager.properties) ^ current_config

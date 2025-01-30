@@ -8,8 +8,8 @@ import glob
 import logging
 import socket
 import subprocess
+from dataclasses import dataclass
 from functools import cached_property
-from typing import TypedDict  # nosec B404
 
 from ops.pebble import ExecError
 
@@ -19,7 +19,13 @@ from literals import CONFIG_DIR, GROUP, KEYSTORE_PATH, SNAP_NAME, TRUSTSTORE_PAT
 
 logger = logging.getLogger(__name__)
 
-Sans = TypedDict("Sans", {"sans_ip": list[str], "sans_dns": list[str]})
+
+@dataclass
+class Sans:
+    """Data class for modeling TLS SANs."""
+
+    sans_ip: list[str]
+    sans_dns: list[str]
 
 
 class TLSManager:
@@ -139,12 +145,10 @@ class TLSManager:
     ) -> Sans:
         """Builds a SAN dict of DNS names and IPs for the unit."""
         if self.substrate == "vm":
-            return {
-                "sans_ip": [
-                    self.unit_context.internal_address,
-                ],
-                "sans_dns": [self.unit_context.unit.name, socket.getfqdn()],
-            }
+            return Sans(
+                sans_ip=[self.unit_context.internal_address],
+                sans_dns=[self.unit_context.unit.name, socket.getfqdn()],
+            )
         else:
             raise NotImplementedError
 
@@ -175,7 +179,35 @@ class TLSManager:
             if san_type.strip() == "IP Address":
                 sans_ip.append(san_value)
 
-        return {"sans_ip": sorted(sans_ip), "sans_dns": sorted(sans_dns)}
+        return Sans(sans_ip=sorted(sans_ip), sans_dns=sorted(sans_dns))
+
+    @property
+    def sans_change_detected(self) -> bool:
+        """Checks whether SANs has changed or not based on a comparison of TLS context with the last state available to the manager."""
+        current_sans = self.get_current_sans()
+        expected_sans = self.build_sans()
+
+        current_sans_ip = set(current_sans.sans_ip) if current_sans else set()
+        expected_sans_ip = set(expected_sans.sans_ip) if current_sans else set()
+        sans_ip_changed = current_sans_ip ^ expected_sans_ip
+
+        current_sans_dns = set(current_sans.sans_dns) if current_sans else set()
+        expected_sans_dns = set(expected_sans.sans_dns) if current_sans else set()
+        sans_dns_changed = current_sans_dns ^ expected_sans_dns
+
+        if not sans_ip_changed and not sans_dns_changed:
+            return False
+
+        logger.info(
+            (
+                f"SANs change detected - "
+                f"OLD SANs IP = {current_sans_ip - expected_sans_ip}, "
+                f"NEW SANs IP = {expected_sans_ip - current_sans_ip}, "
+                f"OLD SANs DNS = {current_sans_dns - expected_sans_dns}, "
+                f"NEW SANs DNS = {expected_sans_dns - current_sans_dns}"
+            )
+        )
+        return True
 
     def remove_stores(self) -> None:
         """Cleans up all keys/certs/stores on a unit."""
