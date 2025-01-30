@@ -15,6 +15,7 @@ from ops import (
 
 from core.models import Context
 from core.structured_config import CharmConfig
+from events.connect import ConnectHandler
 from events.kafka import KafkaHandler
 from literals import (
     CHARM_KEY,
@@ -45,6 +46,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.config_manager = ConfigManager(
             context=self.context, workload=self.workload, config=self.config
         )
+        self.set_properties = self.config_manager.set_properties
 
         self.framework.observe(getattr(self.on, "install"), self._on_install)
         self.framework.observe(getattr(self.on, "start"), self._on_start)
@@ -52,6 +54,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
+        self.connect = ConnectHandler(self)
         self.kafka = KafkaHandler(self)
 
     def _on_install(self, _) -> None:

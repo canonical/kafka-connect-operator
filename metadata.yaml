@@ -35,8 +35,15 @@ requires:
 resources:
   connect-plugin:
     type: file
-    filename: "plugin.tar.gz"
+    filename: "plugin.tar"
     description: |
       Path to a local TAR archive containing JAR file(s) with the implementation of one or more connectors, transformers, or converters.
       This TAR archive will be added to Kafka Connect `plugin.path`.
       The archive should not contain any libraries provided by the Kafka Connect runtime.
+
+storage:
+  plugins:
+    type: filesystem
+    description: Directory where the plugins are stored
+    minimum-size: 1G
+    location: /var/snap/charmed-kafka/common/var/lib/connect

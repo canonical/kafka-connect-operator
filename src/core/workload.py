@@ -82,6 +82,21 @@ class WorkloadBase(ABC):
         """
         ...
 
+    @abstractmethod
+    def mkdir(self, path: str):
+        """Creates a new directory at the provided path."""
+        ...
+
+    @abstractmethod
+    def rmdir(self, path: str):
+        """Removes the directory at the provided path."""
+        ...
+
+    @abstractmethod
+    def check_socket(self, host: str, port: int) -> bool:
+        """Checks whether an IPv4 socket is healthy or not."""
+        ...
+
     def get_version(self) -> str:
         """Get the workload version."""
         if not self.active:

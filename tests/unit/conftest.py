@@ -8,9 +8,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 import yaml
-from ops.testing import Container, Context, State
+from ops.testing import Container, Context, Resource, State
 from src.charm import ConnectCharm
-from src.literals import CONTAINER, SNAP_NAME, SUBSTRATE
+from src.literals import CONTAINER, PLUGIN_RESOURCE_KEY, SNAP_NAME, SUBSTRATE
 
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 ACTIONS = yaml.safe_load(Path("./actions.yaml").read_text())
@@ -65,3 +65,16 @@ def kafka_client_rel():
         "tls-ca": "disabled",
         "endpoints": "10.10.10.10:9092,10.10.10.11:9092",
     }
+
+
+@pytest.fixture(scope="module")
+def plugin_resource():
+    return Resource(name=PLUGIN_RESOURCE_KEY, path="./tests/unit/resources/FakePlugin.tar")
+
+
+@pytest.fixture(scope="module")
+def active_service():
+    with patch(
+        "managers.connect.ConnectManager.health_check", return_value=True
+    ) as patched_service:
+        yield patched_service

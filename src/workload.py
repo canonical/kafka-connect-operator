@@ -6,7 +6,9 @@
 
 import logging
 import os
+import socket
 import subprocess
+from contextlib import closing
 from typing import Mapping
 
 from charms.operator_libs_linux.v2 import snap
@@ -36,11 +38,6 @@ class Workload(WorkloadBase):
         self.container = container
         self.kafka = snap.SnapCache()[SNAP_NAME]
         self.service = SERVICE_NAME
-
-    @property
-    @override
-    def container_can_connect(self) -> bool:
-        return True  # Always True on VM
 
     @override
     def start(self) -> None:
@@ -142,6 +139,25 @@ class Workload(WorkloadBase):
         bin_str = " ".join(bin_args)
         command = f"{opts_str} {SNAP_NAME}.{bin_keyword} {bin_str}"
         return self.exec(command)
+
+    @override
+    def mkdir(self, path: str):
+        self.exec(["mkdir", path])
+
+    @override
+    def rmdir(self, path: str):
+        self.exec(["rm", "-r", path])
+
+    @override
+    def check_socket(self, host: str, port: int) -> bool:
+        """Checks whether an IPv4 socket is healthy or not."""
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            return sock.connect_ex((host, port)) == 0
+
+    @property
+    @override
+    def container_can_connect(self) -> bool:
+        return True  # Always True on VM
 
     @property
     @override

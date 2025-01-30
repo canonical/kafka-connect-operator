@@ -58,7 +58,7 @@ def test_kafka_client_relation_created_waits_for_credentials(
 
 @pytest.mark.parametrize("broker_available", [False, True])
 def test_kafka_client_relation_created_checks_broker_availability(
-    ctx: Context, base_state: State, kafka_client_rel: dict, broker_available: bool
+    ctx: Context, base_state: State, kafka_client_rel: dict, broker_available: bool, active_service
 ) -> None:
     """Checks unit checks Kafka broker listener availability before transitioning to Active status."""
     # Given
@@ -68,7 +68,7 @@ def test_kafka_client_relation_created_checks_broker_availability(
     # When
     with (
         patch(
-            "managers.kafka.KafkaManager._check_socket",
+            "workload.Workload.check_socket",
             return_value=broker_available,
         ) as fake_check_socket,
         patch("workload.Workload.restart") as _restart,
@@ -85,7 +85,7 @@ def test_kafka_client_relation_created_checks_broker_availability(
 
 
 def test_kafka_client_relation_change_triggers_restart(
-    ctx: Context, base_state: State, kafka_client_rel: dict, patched_snap
+    ctx: Context, base_state: State, kafka_client_rel: dict, active_service
 ) -> None:
     """Checks change in `kafka-client` relation configuration triggers a restart."""
     # Given

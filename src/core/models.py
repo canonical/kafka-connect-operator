@@ -4,6 +4,7 @@
 
 """Collection of context objects for the Kafka Connect charm relations, apps and units."""
 
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from charms.data_platform_libs.v0.data_interfaces import (
@@ -15,6 +16,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from ops import Object
 from ops.model import Application, Relation, Unit
+from typing_extensions import override
 
 from literals import (
     DEFAULT_SECURITY_MECHANISM,
@@ -22,6 +24,7 @@ from literals import (
     PEER_REL,
     SUBSTRATE,
     TOPICS,
+    Status,
     Substrates,
 )
 
@@ -29,7 +32,25 @@ if TYPE_CHECKING:
     from charm import ConnectCharm
 
 
-class RelationContext:
+class WithStatus(ABC):
+    """Abstract base mixin class for objects with status."""
+
+    @property
+    @abstractmethod
+    def status(self) -> Status:
+        """Returns status of the object."""
+        ...
+
+    @property
+    def ready(self) -> bool:
+        """Returns True if the status is Active and False otherwise."""
+        if self.status == Status.ACTIVE:
+            return True
+
+        return False
+
+
+class RelationContext(WithStatus):
     """Relation context object."""
 
     def __init__(
@@ -118,6 +139,17 @@ class KafkaClientContext(RelationContext):
         """Returns the security mechanism in use."""
         return DEFAULT_SECURITY_MECHANISM
 
+    @property
+    @override
+    def status(self) -> Status:
+        if not self.relation:
+            return Status.MISSING_KAFKA
+
+        if not self.bootstrap_servers:
+            return Status.NO_KAFKA_CREDENTIALS
+
+        return Status.ACTIVE
+
 
 class WorkerUnitContext(RelationContext):
     """Context collection metadata for a single Kafka Connect worker unit."""
@@ -151,8 +183,13 @@ class WorkerUnitContext(RelationContext):
 
         return addr
 
+    @property
+    @override
+    def status(self) -> Status:
+        return Status.ACTIVE
 
-class Context(Object):
+
+class Context(WithStatus, Object):
     """Context model for the Kafka Connect charm."""
 
     def __init__(self, charm: "ConnectCharm", substrate: Substrates):
@@ -192,6 +229,24 @@ class Context(Object):
         return False
 
     @property
+    def rest_port(self) -> int:
+        """Returns the REST API port."""
+        return self.config.rest_port
+
+    @property
     def rest_protocol(self) -> str:
         """Returns the REST API protocol, either `http` or `https`."""
         return "http" if not self.tls_enabled else "https"
+
+    @property
+    def rest_uri(self) -> str:
+        """Returns the REST API base URI."""
+        return f"{self.rest_protocol}://{self.worker_unit.internal_address}:{self.rest_port}"
+
+    @property
+    @override
+    def status(self) -> Status:
+        if not self.kafka_client.ready:
+            return self.kafka_client.status
+
+        return Status.ACTIVE

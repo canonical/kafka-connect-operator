@@ -14,6 +14,7 @@ from literals import (
     CONFIG_PATH,
     DEFAULT_CONVERTER_CLASS,
     GROUP_ID,
+    PLUGIN_PATH,
     REPLICATION_FACTOR,
     TOPICS,
     ClientModes,
@@ -116,7 +117,7 @@ class ConfigManager:
     @property
     def listeners(self) -> str:
         """Listener(s) for the REST API endpoint."""
-        return f"{self.context.rest_protocol}://{self.context.worker_unit.internal_address}:{self.config.rest_port}"
+        return f"{self.context.rest_protocol}://{self.context.worker_unit.internal_address}:{self.context.rest_port}"
 
     @property
     def properties(self) -> list[str]:
@@ -126,6 +127,7 @@ class ConfigManager:
                 f"bootstrap.servers={self.context.kafka_client.bootstrap_servers}",
                 f"group.id={GROUP_ID}",
                 f"listeners={self.listeners}",
+                f"plugin.path={PLUGIN_PATH}",
             ]
             + DEFAULT_CONFIG_OPTIONS.split("\n")
             + self.client_properties
