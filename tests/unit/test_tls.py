@@ -2,7 +2,7 @@ import dataclasses
 import json
 import logging
 from typing import cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 from charms.tls_certificates_interface.v3.tls_certificates import (
@@ -20,6 +20,25 @@ from src.literals import PEER_REL, TLS_REL, Status
 from src.managers.tls import TLSManager
 
 logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class TLSArtifacts:
+    ca_key: bytes
+    ca: bytes
+    private_key: bytes
+    cert: bytes
+    csr: bytes
+
+
+@pytest.fixture()
+def tls_artifacts() -> TLSArtifacts:
+    ca_key = generate_private_key()
+    ca = generate_ca(private_key=ca_key, subject="TEST-CA")
+    private_key = generate_private_key()
+    csr = generate_csr(private_key=private_key, subject="kafka-connect/0")
+    cert = generate_certificate(csr, ca, ca_key)
+    return TLSArtifacts(ca_key=ca_key, ca=ca, private_key=private_key, cert=cert, csr=csr)
 
 
 @pytest.mark.parametrize("is_leader", [True, False])
@@ -130,28 +149,27 @@ def test_tls_relation_joined(
 
 
 @pytest.mark.parametrize("chain", [[], ["cert-1", "cert-2", "cert-3"]])
-def test_tls_certificate_available(ctx: Context, base_state: State, chain) -> None:
+def test_tls_certificate_available(
+    ctx: Context, base_state: State, chain, tls_artifacts: TLSArtifacts, active_service: MagicMock
+) -> None:
     """Checks on `certificate-available` event, local unit data is updated accordingly."""
     # Given
-    ca_key = generate_private_key()
-    ca = generate_ca(private_key=ca_key, subject="TEST-CA")
-    private_key = generate_private_key()
-    csr = generate_csr(private_key=private_key, subject="kafka-connect/0")
-
     state_in = base_state
     peer_rel = PeerRelation(
         PEER_REL,
         PEER_REL,
         local_app_data={"tls": "enabled"},
-        local_unit_data={TLSContext.CSR: csr.decode("utf-8")},
+        local_unit_data={TLSContext.CSR: tls_artifacts.csr.decode("utf-8")},
     )
     tls_rel = Relation(TLS_REL, TLS_REL)
     tls_manager_mock = MagicMock(spec=TLSManager)
     event = CertificateAvailableEvent(
         handle=MagicMock(),
-        certificate=generate_certificate(csr, ca, ca_key).decode("utf-8"),
-        certificate_signing_request=csr.decode("utf-8"),
-        ca=ca.decode("utf-8"),
+        certificate=generate_certificate(
+            tls_artifacts.csr, tls_artifacts.ca, tls_artifacts.ca_key
+        ).decode("utf-8"),
+        certificate_signing_request=tls_artifacts.csr.decode("utf-8"),
+        ca=tls_artifacts.ca.decode("utf-8"),
         chain=chain,
     )
 
@@ -160,7 +178,8 @@ def test_tls_certificate_available(ctx: Context, base_state: State, chain) -> No
     # When
     with (ctx(ctx.on.update_status(), state_in) as mgr,):
         charm: ConnectCharm = cast(ConnectCharm, mgr.charm)
-        charm.tls.tls_manager = tls_manager_mock
+        charm.tls_manager = tls_manager_mock
+        charm.tls_manager.sans_change_detected = False
         charm.tls._on_certificate_available(event)
         state_out = mgr.run()
 
@@ -178,15 +197,13 @@ def test_tls_certificate_available(ctx: Context, base_state: State, chain) -> No
     assert len(json.loads(peer_rel.local_unit_data.get(TLSContext.CHAIN, ""))) == len(chain)
 
 
-def test_tls_certificate_expiring(ctx: Context, base_state: State, active_service) -> None:
+def test_tls_certificate_expiring(
+    ctx: Context, base_state: State, tls_artifacts: TLSArtifacts, active_service: MagicMock
+) -> None:
     """Checks `certificate-expiring` event leads to new CSR being submitted."""
     # Given
-    ca_key = generate_private_key()
-    ca = generate_ca(private_key=ca_key, subject="TEST-CA")
-    private_key = generate_private_key()
     other_private_key = generate_private_key()
     csr = generate_csr(private_key=other_private_key, subject="kafka-connect/0")
-    cert = generate_certificate(csr, ca, ca_key)
 
     state_in = base_state
     peer_rel = PeerRelation(
@@ -196,7 +213,9 @@ def test_tls_certificate_expiring(ctx: Context, base_state: State, active_servic
     )
     tls_rel = Relation(TLS_REL, TLS_REL)
     event = CertificateExpiringEvent(
-        handle=MagicMock(), certificate=cert.decode("utf-8"), expiry="1990-01-01 00:00:00"
+        handle=MagicMock(),
+        certificate=tls_artifacts.cert.decode("utf-8"),
+        expiry="1990-01-01 00:00:00",
     )
 
     state_in = dataclasses.replace(base_state, relations=[tls_rel, peer_rel])
@@ -207,7 +226,7 @@ def test_tls_certificate_expiring(ctx: Context, base_state: State, active_servic
         charm.context.worker_unit.update(
             items={
                 TLSContext.CSR: csr.decode("utf-8"),
-                TLSContext.PRIVATE_KEY: private_key.decode("utf-8"),
+                TLSContext.PRIVATE_KEY: tls_artifacts.private_key.decode("utf-8"),
             }
         )
         charm.tls._on_certificate_expiring(event)
@@ -220,5 +239,49 @@ def test_tls_certificate_expiring(ctx: Context, base_state: State, active_servic
     # Then
     # TODO: better assertions?
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
-    assert secret_contents.get(TLSContext.PRIVATE_KEY) == private_key.decode("utf-8")
+    assert secret_contents.get(TLSContext.PRIVATE_KEY) == tls_artifacts.private_key.decode("utf-8")
     assert secret_contents.get(TLSContext.CSR) != csr.decode("utf-8")
+
+
+@pytest.mark.parametrize("sans_changed", [False, True])
+def test_sans_change_leads_to_new_cert_request(
+    ctx: Context,
+    base_state: State,
+    tls_artifacts: TLSArtifacts,
+    sans_changed: bool,
+    active_service: MagicMock,
+) -> None:
+    """Checks whether a SANs change leads to the old certificate being removed and new certificate requested."""
+    # Given
+    state_in = base_state
+    peer_rel = PeerRelation(
+        PEER_REL,
+        PEER_REL,
+        local_app_data={"tls": "enabled"},
+        local_unit_data={
+            TLSContext.CERT: tls_artifacts.cert.decode("utf-8"),
+            TLSContext.PRIVATE_KEY: tls_artifacts.private_key.decode("utf-8"),
+            TLSContext.CSR: "old-csr",
+            "private-address": "10.10.10.10",
+        },
+    )
+    tls_rel = Relation(TLS_REL, TLS_REL)
+    state_in = dataclasses.replace(base_state, relations=[tls_rel, peer_rel])
+
+    with patch(
+        "managers.tls.TLSManager.sans_change_detected", PropertyMock(return_value=sans_changed)
+    ):
+        _ = ctx.run(ctx.on.config_changed(), state_in)
+
+    if sans_changed:
+        assert peer_rel.local_unit_data.get(TLSContext.CSR, "")
+        assert peer_rel.local_unit_data.get(TLSContext.CSR, "") != "old-csr"
+        # cert is probably empty at this point, but we just care that old cert is not used anymore
+        assert peer_rel.local_unit_data.get(TLSContext.CERT, "") != tls_artifacts.cert.decode(
+            "utf-8"
+        )
+    else:
+        assert peer_rel.local_unit_data.get(TLSContext.CSR, "") == "old-csr"
+        assert peer_rel.local_unit_data.get(TLSContext.CERT, "") == tls_artifacts.cert.decode(
+            "utf-8"
+        )

@@ -34,7 +34,6 @@ class TLSHandler(Object):
         self.charm = charm
         self.tls_rel = relation_name
         self.unit_tls_context = charm.context.worker_unit.tls
-        self.tls_manager = self.charm.tls_manager
         self.certificates = TLSCertificatesRequiresV3(charm, self.tls_rel)
 
         self.framework.observe(
@@ -64,22 +63,16 @@ class TLSHandler(Object):
     def _tls_relation_joined(self, _) -> None:
         """Handler for `certificates_relation_joined` event."""
         # generate unit private key if not already created by action
-        if not self.unit_tls_context.private_key:
-            self.charm.context.worker_unit.update(
-                {self.unit_tls_context.PRIVATE_KEY: generate_private_key().decode("utf-8")}
-            )
-
-        # generate unit private key if not already created by action
-        if not self.unit_tls_context.keystore_password:
-            self.charm.context.worker_unit.update(
-                {self.unit_tls_context.KEYSTORE_PASSWORD: self.charm.workload.generate_password()}
-            )
-        if not self.unit_tls_context.truststore_password:
-            self.charm.context.worker_unit.update(
-                {
-                    self.unit_tls_context.TRUSTSTORE_PASSWORD: self.charm.workload.generate_password()
-                }
-            )
+        self.charm.context.worker_unit.update(
+            {
+                self.unit_tls_context.PRIVATE_KEY: self.unit_tls_context.private_key
+                or generate_private_key().decode("utf-8"),
+                self.unit_tls_context.KEYSTORE_PASSWORD: self.unit_tls_context.keystore_password
+                or self.charm.workload.generate_password(),
+                self.unit_tls_context.TRUSTSTORE_PASSWORD: self.unit_tls_context.truststore_password
+                or self.charm.workload.generate_password(),
+            }
+        )
 
         self._request_certificate()
 
@@ -88,7 +81,7 @@ class TLSHandler(Object):
         self.charm.context.worker_unit.update({key: "" for key in self.unit_tls_context.KEYS})
 
         # remove all existing keystores from the unit so we don't preserve certs
-        self.tls_manager.remove_stores()
+        self.charm.tls_manager.remove_stores()
 
         if not self.charm.unit.is_leader():
             return
@@ -116,12 +109,12 @@ class TLSHandler(Object):
             }
         )
 
-        self.tls_manager.set_server_key()
-        self.tls_manager.set_ca()
-        self.tls_manager.set_certificate()
-        self.tls_manager.set_chain()
-        self.tls_manager.set_truststore()
-        self.tls_manager.set_keystore()
+        self.charm.tls_manager.set_server_key()
+        self.charm.tls_manager.set_ca()
+        self.charm.tls_manager.set_certificate()
+        self.charm.tls_manager.set_chain()
+        self.charm.tls_manager.set_truststore()
+        self.charm.tls_manager.set_keystore()
 
         self.charm.on.config_changed.emit()
 
@@ -135,13 +128,13 @@ class TLSHandler(Object):
             logger.error("Can't request certificate, missing private key")
             return
 
-        sans = self.tls_manager.build_sans()
+        sans = self.charm.tls_manager.build_sans()
 
         csr = generate_csr(
             private_key=self.unit_tls_context.private_key.encode("utf-8"),
             subject=self.charm.context.worker_unit.internal_address,
-            sans_ip=sans["sans_ip"],
-            sans_dns=sans["sans_dns"],
+            sans_ip=sans.sans_ip,
+            sans_dns=sans.sans_dns,
         )
         self.charm.context.worker_unit.update(
             {self.unit_tls_context.CSR: csr.decode("utf-8").strip()}
@@ -159,12 +152,12 @@ class TLSHandler(Object):
             logger.error("Missing unit private key and/or old csr")
             return
 
-        sans = self.tls_manager.build_sans()
+        sans = self.charm.tls_manager.build_sans()
         new_csr = generate_csr(
             private_key=self.unit_tls_context.private_key.encode("utf-8"),
             subject=self.charm.context.worker_unit.internal_address,
-            sans_ip=sans["sans_ip"],
-            sans_dns=sans["sans_dns"],
+            sans_ip=sans.sans_ip,
+            sans_dns=sans.sans_dns,
         )
 
         self.certificates.request_certificate_renewal(
