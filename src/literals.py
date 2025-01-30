@@ -30,10 +30,13 @@ DEFAULT_CONVERTER_CLASS = "org.apache.kafka.connect.json.JsonConverter"
 DEFAULT_API_PROTOCOL = "http"
 DEFAULT_API_PORT = 8083
 
-CONFIG_PATH = f"/var/snap/{SNAP_NAME}/current/etc/connect/connect-distributed.properties"
 SERVICE_NAME = "connect-distributed"
 PLUGIN_RESOURCE_KEY = "connect-plugin"
 PLUGIN_PATH = f"/var/snap/{SNAP_NAME}/common/var/lib/connect/plugins/"
+CONFIG_DIR = f"/var/snap/{SNAP_NAME}/current/etc/connect"
+CONFIG_PATH = f"{CONFIG_DIR}/connect-distributed.properties"
+KEYSTORE_PATH = f"{CONFIG_DIR}/keystore.p12"
+TRUSTSTORE_PATH = f"{CONFIG_DIR}/truststore.jks"
 
 TOPICS = {"offset": "connect-offset", "config": "connect-config", "status": "connect-status"}
 REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
@@ -41,6 +44,7 @@ REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
 # Relations
 KAFKA_CLIENT_REL = "kafka-client"
 PEER_REL = "worker"
+TLS_REL = "certificates"
 
 # TODO: this should be set using `profile` config option in the future
 LOG_SENSITIVE_OUTPUT = True  # set False for production mode & builds

@@ -5,6 +5,8 @@
 """Workload base interface definition."""
 
 import re
+import secrets
+import string
 from abc import ABC, abstractmethod
 
 from ops.pebble import Layer
@@ -93,8 +95,25 @@ class WorkloadBase(ABC):
         ...
 
     @abstractmethod
+    def remove(self, path: str):
+        """Removes the file at the provided path."""
+        ...
+
+    @abstractmethod
     def check_socket(self, host: str, port: int) -> bool:
         """Checks whether an IPv4 socket is healthy or not."""
+        ...
+
+    @property
+    @abstractmethod
+    def layer(self) -> Layer:
+        """Gets the Pebble Layer definition for the current workload."""
+        ...
+
+    @property
+    @abstractmethod
+    def container_can_connect(self) -> bool:
+        """Flag to check if workload container can connect."""
         ...
 
     def get_version(self) -> str:
@@ -108,14 +127,9 @@ class WorkloadBase(ABC):
             version = ""
         return version
 
-    @property
-    @abstractmethod
-    def layer(self) -> Layer:
-        """Gets the Pebble Layer definition for the current workload."""
-        ...
-
-    @property
-    @abstractmethod
-    def container_can_connect(self) -> bool:
-        """Flag to check if workload container can connect."""
-        ...
+    @staticmethod
+    def generate_password(length: int = 32) -> str:
+        """Creates randomized string of arbitrary `length` (default is 32) for use as app passwords."""
+        return "".join(
+            [secrets.choice(string.ascii_letters + string.digits) for _ in range(length)]
+        )
