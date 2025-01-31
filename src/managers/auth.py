@@ -55,10 +55,7 @@ class AuthManager:
         Args:
             credentials (dict[str, str]): a dict of username: password mapping to be updated.
         """
-        cache = self._load_credentials()
-        for username, password in credentials.items():
-            cache[username] = password
-
+        cache = self._load_credentials() | credentials
         self._save_credentials(cache)
 
     @property
