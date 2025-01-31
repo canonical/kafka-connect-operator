@@ -6,7 +6,7 @@
 
 import inspect
 import logging
-from typing import Iterable, cast
+from typing import cast
 
 from core.models import Context
 from core.structured_config import CharmConfig
@@ -15,7 +15,6 @@ from literals import (
     CONFIG_PATH,
     DEFAULT_AUTH_CLASS,
     DEFAULT_CONVERTER_CLASS,
-    ENV_PATH,
     GROUP_ID,
     JAAS_PATH,
     PASSWORDS_PATH,
@@ -55,18 +54,6 @@ class ConfigManager:
         self.config = config
         self.current_version = current_version
 
-    @staticmethod
-    def map_env(env: Iterable[str]) -> dict[str, str]:
-        """Parse env variables into a dict."""
-        map_env = {}
-        for var in env:
-            key = "".join(var.split("=", maxsplit=1)[0])
-            value = "".join(var.split("=", maxsplit=1)[1:])
-            if key:
-                # only check for keys, as we can have an empty value for a variable
-                map_env[key] = value
-        return map_env
-
     def _add_converter(
         self, converter_mode: Converters, converter_class: str = DEFAULT_CONVERTER_CLASS
     ) -> str:
@@ -92,35 +79,22 @@ class ConfigManager:
             f'{prefix_}sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{username}" password="{password}";',
         ]
 
-    def set_environment(self) -> None:
-        """Writes the env-vars needed for passing to charmed-kafka service."""
-        updated_env_list = [
-            self.kafka_opts,
-        ]
-
-        raw_current_env = self.workload.read(ENV_PATH)
-        current_env = self.map_env(raw_current_env)
-
-        updated_env = current_env | self.map_env(updated_env_list)
-        content = "\n".join([f"{key}={value}" for key, value in updated_env.items()])
-        self.workload.write(content=content + "\n", path=ENV_PATH)
-
-    def set_jaas_config(self) -> None:
+    def save_jaas_config(self) -> None:
         """Writes JAAS configuration to `JAAS_PATH`."""
         if not self.jaas_config:
             return
 
         self.workload.write(content=self.jaas_config + "\n", path=JAAS_PATH)
 
-    def set_properties(self) -> None:
+    def save_properties(self) -> None:
         """Writes all Kafka Connect config properties to the `connect-distributed.properties` path."""
         self.workload.write(content="\n".join(self.properties) + "\n", path=CONFIG_PATH)
 
     def configure(self) -> None:
         """Make all steps necessary to start the Connect service, including setting env vars, JAAS config and service config files."""
-        self.set_environment()
-        self.set_jaas_config()
-        self.set_properties()
+        self.workload.set_environment(env_vars=[self.kafka_opts])
+        self.save_jaas_config()
+        self.save_properties()
 
     @property
     def converter_properties(self) -> list[str]:
@@ -192,7 +166,6 @@ class ConfigManager:
             f"rest.advertised.host.name={self.context.worker_unit.internal_address}",
             f"rest.advertised.host.port={self.context.rest_port}",
         ]
-
 
     @property
     def properties(self) -> list[str]:

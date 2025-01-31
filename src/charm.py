@@ -48,7 +48,6 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.config_manager = ConfigManager(
             context=self.context, workload=self.workload, config=self.config
         )
-        self.set_properties = self.config_manager.set_properties
 
         self.framework.observe(getattr(self.on, "install"), self._on_install)
         self.framework.observe(getattr(self.on, "start"), self._on_start)

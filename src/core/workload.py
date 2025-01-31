@@ -8,6 +8,7 @@ import re
 import secrets
 import string
 from abc import ABC, abstractmethod
+from typing import Iterable
 
 from ops.pebble import Layer
 
@@ -97,6 +98,11 @@ class WorkloadBase(ABC):
     @abstractmethod
     def check_socket(self, host: str, port: int) -> bool:
         """Checks whether an IPv4 socket is healthy or not."""
+        ...
+
+    @abstractmethod
+    def set_environment(self, env_vars: Iterable[str]) -> None:
+        """Updates the environment variables with provided iterable of key=value `env_vars`."""
         ...
 
     def get_version(self) -> str:

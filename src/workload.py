@@ -9,7 +9,7 @@ import os
 import socket
 import subprocess
 from contextlib import closing
-from typing import Mapping
+from typing import Iterable, Mapping
 
 from charms.operator_libs_linux.v2 import snap
 from ops import Container, pebble
@@ -19,6 +19,7 @@ from typing_extensions import override
 from core.workload import WorkloadBase
 from literals import (
     CHARMED_KAFKA_SNAP_REVISION,
+    ENV_PATH,
     GROUP,
     LOG_SENSITIVE_OUTPUT,
     SERVICE_NAME,
@@ -154,6 +155,15 @@ class Workload(WorkloadBase):
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
             return sock.connect_ex((host, port)) == 0
 
+    @override
+    def set_environment(self, env_vars: Iterable[str]) -> None:
+        raw_current_env = self.read(ENV_PATH)
+        current_env = self.map_env(raw_current_env)
+
+        updated_env = current_env | self.map_env(env_vars)
+        content = "\n".join([f"{key}={value}" for key, value in updated_env.items()])
+        self.write(content=content + "\n", path=ENV_PATH)
+
     @property
     @override
     def container_can_connect(self) -> bool:
@@ -163,3 +173,15 @@ class Workload(WorkloadBase):
     @override
     def layer(self) -> pebble.Layer:
         raise NotImplementedError
+
+    @staticmethod
+    def map_env(env: Iterable[str]) -> dict[str, str]:
+        """Parse env variables into a dict."""
+        map_env = {}
+        for var in env:
+            key = "".join(var.split("=", maxsplit=1)[0])
+            value = "".join(var.split("=", maxsplit=1)[1:])
+            if key:
+                # only check for keys, as we can have an empty value for a variable
+                map_env[key] = value
+        return map_env
