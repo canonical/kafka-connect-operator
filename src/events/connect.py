@@ -77,11 +77,7 @@ class ConnectHandler(Object):
 
         self.enable_auth()
         self.charm.config_manager.configure()
-
-        if not self.connect_manager.restart_worker():
-            self.charm._set_status(Status.SERVICE_NOT_RUNNING)
-            event.defer()
-            return
+        self.connect_manager.restart_worker()
 
         self._update_status(event)
 
@@ -96,5 +92,7 @@ class ConnectHandler(Object):
 
         # Update internal credentials store
         self.charm.auth_manager.update(
-            {self.context.peer_workers.ADMIN_USERNAME: self.context.peer_workers.admin_password}
+            credentials={
+                self.context.peer_workers.ADMIN_USERNAME: self.context.peer_workers.admin_password
+            }
         )

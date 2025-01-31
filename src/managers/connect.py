@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 import requests
+from requests.auth import HTTPBasicAuth
 from tenacity import (
     retry,
     retry_any,
@@ -106,7 +107,12 @@ class ConnectManager:
 
     def ping_connect_api(self) -> requests.Response:
         """Makes a GET request to the unit's Connect API Endpoint and returns the response."""
-        return requests.get(self.context.rest_uri, timeout=self.REQUEST_TIMEOUT, verify=False)
+        auth = HTTPBasicAuth(
+            self.context.peer_workers.ADMIN_USERNAME, self.context.peer_workers.admin_password
+        )
+        return requests.get(
+            self.context.rest_uri, timeout=self.REQUEST_TIMEOUT, auth=auth, verify=False
+        )
 
     @retry(
         wait=wait_fixed(3),
