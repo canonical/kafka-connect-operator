@@ -5,6 +5,7 @@
 import re
 import socket
 from contextlib import closing
+from dataclasses import dataclass
 from pathlib import Path
 
 import requests
@@ -31,6 +32,13 @@ S3_CONNECTOR_LINK = "https://github.com/Aiven-Open/cloud-storage-connectors-for-
 S3_CONNECTOR_CLASS = "io.aiven.kafka.connect.s3.AivenKafkaConnectS3SinkConnector"
 
 
+@dataclass
+class CommandResult:
+    return_code: int | None
+    stdout: str
+    stderr: str
+
+
 def check_socket(host: str | None, port: int) -> bool:
     """Checks whether IPv4 socket is up or not."""
     if host is None:
@@ -38,6 +46,16 @@ def check_socket(host: str | None, port: int) -> bool:
 
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         return sock.connect_ex((host, port)) == 0
+
+
+async def run_command_on_unit(
+    ops_test: OpsTest, unit: Unit, command: str | list[str]
+) -> CommandResult:
+    """Runs a command on a given unit and returns the result."""
+    command_args = command.split() if isinstance(command, str) else command
+    return_code, stdout, stderr = await ops_test.juju("ssh", f"{unit.name}", *command_args)
+
+    return CommandResult(return_code=return_code, stdout=stdout, stderr=stderr)
 
 
 async def get_unit_ipv4_address(ops_test: OpsTest, unit: Unit) -> str | None:
