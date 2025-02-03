@@ -12,13 +12,9 @@ from core.models import Context
 from core.structured_config import CharmConfig
 from core.workload import WorkloadBase
 from literals import (
-    CONFIG_PATH,
     DEFAULT_AUTH_CLASS,
     DEFAULT_CONVERTER_CLASS,
     GROUP_ID,
-    JAAS_PATH,
-    PASSWORDS_PATH,
-    PLUGIN_PATH,
     REPLICATION_FACTOR,
     TOPICS,
     ClientModes,
@@ -84,11 +80,13 @@ class ConfigManager:
         if not self.jaas_config:
             return
 
-        self.workload.write(content=self.jaas_config + "\n", path=JAAS_PATH)
+        self.workload.write(content=self.jaas_config + "\n", path=self.workload.paths.jaas)
 
     def save_properties(self) -> None:
         """Writes all Kafka Connect config properties to the `connect-distributed.properties` path."""
-        self.workload.write(content="\n".join(self.properties) + "\n", path=CONFIG_PATH)
+        self.workload.write(
+            content="\n".join(self.properties) + "\n", path=self.workload.paths.worker_properties
+        )
 
     def configure(self) -> None:
         """Make all steps necessary to start the Connect service, including setting env vars, JAAS config and service config files."""
@@ -125,7 +123,7 @@ class ConfigManager:
             f"""
             KafkaConnect {{
                 org.apache.kafka.connect.rest.basic.auth.extension.PropertyFileLoginModule required
-                file="{PASSWORDS_PATH}";
+                file="{self.workload.paths.passwords}";
             }};
             """
         )
@@ -134,7 +132,7 @@ class ConfigManager:
     def kafka_opts(self) -> str:
         """Returns all necessary options for KAFKA_OPTS env var."""
         opts = [
-            f"-Djava.security.auth.login.config={JAAS_PATH}",
+            f"-Djava.security.auth.login.config={self.workload.paths.jaas}",
         ]
 
         return f"KAFKA_OPTS='{' '.join(opts)}'"
@@ -174,7 +172,7 @@ class ConfigManager:
             [
                 f"bootstrap.servers={self.context.kafka_client.bootstrap_servers}",
                 f"group.id={GROUP_ID}",
-                f"plugin.path={PLUGIN_PATH}",
+                f"plugin.path={self.workload.paths.plugins}",
             ]
             + DEFAULT_CONFIG_OPTIONS.split("\n")
             + self.rest_auth_properties

@@ -8,7 +8,7 @@ import logging
 
 from core.models import Context
 from core.workload import WorkloadBase
-from literals import GROUP, PASSWORDS_PATH, USER
+from literals import GROUP, USER
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class AuthManager:
 
     DELIMITER = ":"
 
-    def __init__(self, context: Context, workload: WorkloadBase, store_path: str = PASSWORDS_PATH):
+    def __init__(self, context: Context, workload: WorkloadBase, store_path: str):
         self.context = context
         self.workload = workload
         self.store_path = store_path

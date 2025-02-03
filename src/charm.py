@@ -44,7 +44,9 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
 
         self.workload = Workload()
         self.context = Context(self, substrate=SUBSTRATE)
-        self.auth_manager = AuthManager(context=self.context, workload=self.workload)
+        self.auth_manager = AuthManager(
+            context=self.context, workload=self.workload, store_path=self.workload.paths.passwords
+        )
         self.config_manager = ConfigManager(
             context=self.context, workload=self.workload, config=self.config
         )

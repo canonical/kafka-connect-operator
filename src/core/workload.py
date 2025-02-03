@@ -12,9 +12,56 @@ from typing import Iterable
 
 from ops.pebble import Layer
 
+from literals import CONFIG_DIR, PLUGIN_PATH
+
+
+class Paths:
+    """Object to store common paths for Kafka Connect worker."""
+
+    def __init__(self, config_dir: str = CONFIG_DIR):
+
+        self.config_dir = config_dir
+
+    @property
+    def env(self) -> str:
+        """Path to environment file."""
+        return "/etc/environment"
+
+    @property
+    def plugins(self) -> str:
+        """Path to plugins folder or storage."""
+        return PLUGIN_PATH
+
+    @property
+    def worker_properties(self) -> str:
+        """Path to distributed connect worker properties file."""
+        return f"{self.config_dir}/connect-distributed.properties"
+
+    @property
+    def jaas(self) -> str:
+        """Path to authentication JAAS config file."""
+        return f"{self.config_dir}/jaas.cfg"
+
+    @property
+    def keystore(self) -> str:
+        """Path to Java Keystore containing service private-key and signed certificates."""
+        return f"{self.config_dir}/keystore.p12"
+
+    @property
+    def truststore(self):
+        """Path to Java Truststore containing trusted CAs + certificates."""
+        return f"{self.config_dir}/truststore.jks"
+
+    @property
+    def passwords(self) -> str:
+        """Path to passwords file store when using PropertyFileLoginModule."""
+        return f"{self.config_dir}/connect.password"
+
 
 class WorkloadBase(ABC):
     """Base interface for common workload operations."""
+
+    paths: Paths = Paths(config_dir=CONFIG_DIR)
 
     @abstractmethod
     def start(self) -> None:

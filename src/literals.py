@@ -33,17 +33,10 @@ DEFAULT_CONVERTER_CLASS = "org.apache.kafka.connect.json.JsonConverter"
 DEFAULT_SECURITY_MECHANISM = "SCRAM-SHA-512"
 GROUP_ID = "connect-cluster"
 
-CONFIG_PATH = f"/var/snap/{SNAP_NAME}/current/etc/connect/connect-distributed.properties"
 SERVICE_NAME = "connect-distributed"
 PLUGIN_RESOURCE_KEY = "connect-plugin"
 PLUGIN_PATH = f"/var/snap/{SNAP_NAME}/common/var/lib/connect/plugins/"
 CONFIG_DIR = f"/var/snap/{SNAP_NAME}/current/etc/connect"
-CONFIG_PATH = f"{CONFIG_DIR}/connect-distributed.properties"
-ENV_PATH = "/etc/environment"
-JAAS_PATH = f"{CONFIG_DIR}/jaas.cfg"
-KEYSTORE_PATH = f"{CONFIG_DIR}/keystore.p12"
-PASSWORDS_PATH = f"{CONFIG_DIR}/connect.password"
-TRUSTSTORE_PATH = f"{CONFIG_DIR}/truststore.jks"
 
 TOPICS = {"offset": "connect-offset", "config": "connect-config", "status": "connect-status"}
 REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor

@@ -15,10 +15,11 @@ from pytest_operator.plugin import OpsTest
 from requests.auth import HTTPBasicAuth
 
 from core.models import PeerWorkersContext
-from literals import DEFAULT_API_PORT, PASSWORDS_PATH
+from literals import CONFIG_DIR, DEFAULT_API_PORT
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
+PASSWORDS_PATH = f"{CONFIG_DIR}/connect.password"
 KAFKA_APP = "kafka"
 KAFKA_CHANNEL = "3/edge"
 MYSQL_APP = "mysql"

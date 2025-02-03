@@ -7,6 +7,7 @@
 import logging
 import os
 from pathlib import Path
+from subprocess import CalledProcessError
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -21,7 +22,7 @@ from tenacity import (
 
 from core.models import Context
 from core.workload import WorkloadBase
-from literals import GROUP, PLUGIN_PATH, USER
+from literals import GROUP, USER
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class ConnectManager:
 
     def _create_plugin_dir(self, plugin_path: Path) -> Path:
         """Creates a unique dir under `PLUGIN_PATH` to better organize lib JAR files."""
-        path = Path(PLUGIN_PATH) / self._plugin_checksum(plugin_path)
+        path = Path(self.workload.paths.plugins) / self._plugin_checksum(plugin_path)
         self.workload.mkdir(f"{path}")
         self.workload.exec(["chown", "-R", f"{USER}:{GROUP}", f"{path}"])
         return path
@@ -71,24 +72,26 @@ class ConnectManager:
         self.workload.exec(["tar", f"-{opts}", str(src_path), "-C", str(dst_path)])
 
     def init_plugin_path(self) -> bool:
-        """Creates `PLUGIN_PATH` folder if not existent, returns False if not successful."""
-        if os.path.exists(PLUGIN_PATH):
-            return True
+        """Initiates `PLUGIN_PATH` folder and sets correct ownership and permissions."""
+        if not os.path.exists(self.workload.paths.plugins):
+            self.workload.mkdir(self.workload.paths.plugins)
 
         try:
-            self.workload.mkdir(f"{PLUGIN_PATH}")
-            return True
-        except FileNotFoundError:
-            pass
+            self.workload.exec(["chmod", "-R", "750", f"{self.workload.paths.plugins}"])
+            self.workload.exec(
+                ["chown", "-R", f"{USER}:{GROUP}", f"{self.workload.paths.plugins}"]
+            )
+        except CalledProcessError:
+            return False
 
-        return False
+        return True
 
     def reload_plugins(self) -> None:
         """Reloads the local `plugins_cache`."""
         try:
             self._plugins_cache = {
                 f.name
-                for f in os.scandir(PLUGIN_PATH)
+                for f in os.scandir(self.workload.paths.plugins)
                 if f.is_dir() and not f.name.startswith(".")
             }
         except FileNotFoundError:  # possibly since plugins folder not created yet.

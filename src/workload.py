@@ -19,7 +19,6 @@ from typing_extensions import override
 from core.workload import WorkloadBase
 from literals import (
     CHARMED_KAFKA_SNAP_REVISION,
-    ENV_PATH,
     GROUP,
     LOG_SENSITIVE_OUTPUT,
     SERVICE_NAME,
@@ -157,12 +156,12 @@ class Workload(WorkloadBase):
 
     @override
     def set_environment(self, env_vars: Iterable[str]) -> None:
-        raw_current_env = self.read(ENV_PATH)
+        raw_current_env = self.read(self.paths.env)
         current_env = self.map_env(raw_current_env)
 
         updated_env = current_env | self.map_env(env_vars)
         content = "\n".join([f"{key}={value}" for key, value in updated_env.items()])
-        self.write(content=content + "\n", path=ENV_PATH)
+        self.write(content=content + "\n", path=self.paths.env)
 
     @property
     @override
