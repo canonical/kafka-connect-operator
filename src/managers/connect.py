@@ -7,7 +7,6 @@
 import logging
 import os
 from pathlib import Path
-from subprocess import CalledProcessError
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -46,6 +45,11 @@ class ConnectManager:
         """Local cache of available plugins, populated using checksums of loaded plugins."""
         return self._plugins_cache
 
+    @property
+    def plugin_path_initiated(self) -> bool:
+        """Checks whether plugin path is initiated or not."""
+        return os.path.exists(self.workload.paths.plugins)
+
     def _plugin_checksum(self, plugin_path: Path) -> str:
         """Calculates checksum of a plugin, currently uses SHA-256 algorithm."""
         # Python 3.11+ has hashlib.file_digest(...) method but we use linux utils here for compatibility and better performance.
@@ -71,20 +75,11 @@ class ConnectManager:
 
         self.workload.exec(["tar", f"-{opts}", str(src_path), "-C", str(dst_path)])
 
-    def init_plugin_path(self) -> bool:
+    def init_plugin_path(self) -> None:
         """Initiates `PLUGIN_PATH` folder and sets correct ownership and permissions."""
-        if not os.path.exists(self.workload.paths.plugins):
-            self.workload.mkdir(self.workload.paths.plugins)
-
-        try:
-            self.workload.exec(["chmod", "-R", "750", f"{self.workload.paths.plugins}"])
-            self.workload.exec(
-                ["chown", "-R", f"{USER}:{GROUP}", f"{self.workload.paths.plugins}"]
-            )
-        except CalledProcessError:
-            return False
-
-        return True
+        self.workload.mkdir(self.workload.paths.plugins)
+        self.workload.exec(["chmod", "-R", "750", f"{self.workload.paths.plugins}"])
+        self.workload.exec(["chown", "-R", f"{USER}:{GROUP}", f"{self.workload.paths.plugins}"])
 
     def reload_plugins(self) -> None:
         """Reloads the local `plugins_cache`."""

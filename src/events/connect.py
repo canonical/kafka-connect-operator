@@ -8,7 +8,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ops import ModelError
-from ops.charm import ConfigChangedEvent, StorageAttachedEvent
+from ops.charm import ConfigChangedEvent
 from ops.framework import EventBase, Object
 
 from literals import PLUGIN_RESOURCE_KEY, Status
@@ -34,15 +34,6 @@ class ConnectHandler(Object):
 
         self.framework.observe(getattr(self.charm.on, "update_status"), self._update_status)
         self.framework.observe(getattr(self.charm.on, "config_changed"), self._on_config_changed)
-        self.framework.observe(
-            getattr(self.charm.on, "plugins_storage_attached"), self._on_storage_attached
-        )
-
-    def _on_storage_attached(self, event: StorageAttachedEvent) -> None:
-        """Handler for `plugins_storage_attached` event."""
-        if not self.connect_manager.init_plugin_path():
-            event.defer()
-            return
 
     def _update_status(self, event: EventBase):
         """Handler for `update-status` event."""
@@ -55,6 +46,9 @@ class ConnectHandler(Object):
 
     def _on_config_changed(self, event: ConfigChangedEvent):
         """Handler for `config-changed` event."""
+        if not self.connect_manager.plugin_path_initiated:
+            self.connect_manager.init_plugin_path()
+
         resource_path = None
         try:
             resource_path = self.model.resources.fetch(PLUGIN_RESOURCE_KEY)
