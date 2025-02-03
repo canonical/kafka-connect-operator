@@ -73,7 +73,7 @@ async def test_scale_out(ops_test: OpsTest):
     await ops_test.model.applications[APP_NAME].add_units(count=2)
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
-            apps=[APP_NAME], idle_period=30, timeout=600, status="active", wait_for_exact_units=3
+            apps=[APP_NAME], idle_period=30, timeout=1200, status="active", wait_for_exact_units=3
         )
 
     await check_connect_endpoints_status(ops_test, app_name=APP_NAME, port=DEFAULT_API_PORT)

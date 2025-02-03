@@ -68,6 +68,7 @@ class Status(Enum):
     """Collection of possible statuses for the charm."""
 
     SNAP_NOT_INSTALLED = StatusLevel(BlockedStatus(f"unable to install {SNAP_NAME} snap"), "ERROR")
+    INSTALLING_SNAP = StatusLevel(WaitingStatus(f"Installing {SNAP_NAME}"), "DEBUG")
     MISSING_KAFKA = StatusLevel(BlockedStatus("Application needs Kafka client relation"), "DEBUG")
     NO_KAFKA_CREDENTIALS = StatusLevel(
         WaitingStatus("Waiting for Kafka cluster credentials"), "DEBUG"

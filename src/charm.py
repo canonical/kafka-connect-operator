@@ -62,6 +62,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
 
     def _on_install(self, _) -> None:
         """Handler for `install` event."""
+        self._set_status(Status.INSTALLING_SNAP)
         if not self.workload.install():
             self._set_status(Status.SNAP_NOT_INSTALLED)
             return
