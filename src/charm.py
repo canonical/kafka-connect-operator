@@ -24,6 +24,7 @@ from literals import (
     Status,
     Substrates,
 )
+from managers.auth import AuthManager
 from managers.config import ConfigManager
 from workload import Workload
 
@@ -43,10 +44,12 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
 
         self.workload = Workload()
         self.context = Context(self, substrate=SUBSTRATE)
+        self.auth_manager = AuthManager(
+            context=self.context, workload=self.workload, store_path=self.workload.paths.passwords
+        )
         self.config_manager = ConfigManager(
             context=self.context, workload=self.workload, config=self.config
         )
-        self.set_properties = self.config_manager.set_properties
 
         self.framework.observe(getattr(self.on, "install"), self._on_install)
         self.framework.observe(getattr(self.on, "start"), self._on_start)
@@ -81,7 +84,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
 
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handler for `collect-status` event."""
-        for status in self.pending_inactive_statuses + [Status.ACTIVE]:
+        for status in self.pending_inactive_statuses + [self.context.status]:
             event.add_status(status.value.status)
 
 

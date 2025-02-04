@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 import requests
+from requests.auth import HTTPBasicAuth
 from tenacity import (
     retry,
     retry_any,
@@ -20,7 +21,7 @@ from tenacity import (
 
 from core.models import Context
 from core.workload import WorkloadBase
-from literals import GROUP, PLUGIN_PATH, USER
+from literals import GROUP, USER
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,11 @@ class ConnectManager:
         """Local cache of available plugins, populated using checksums of loaded plugins."""
         return self._plugins_cache
 
+    @property
+    def plugin_path_initiated(self) -> bool:
+        """Checks whether plugin path is initiated or not."""
+        return os.path.exists(self.workload.paths.plugins)
+
     def _plugin_checksum(self, plugin_path: Path) -> str:
         """Calculates checksum of a plugin, currently uses SHA-256 algorithm."""
         # Python 3.11+ has hashlib.file_digest(...) method but we use linux utils here for compatibility and better performance.
@@ -52,7 +58,7 @@ class ConnectManager:
 
     def _create_plugin_dir(self, plugin_path: Path) -> Path:
         """Creates a unique dir under `PLUGIN_PATH` to better organize lib JAR files."""
-        path = Path(PLUGIN_PATH) / self._plugin_checksum(plugin_path)
+        path = Path(self.workload.paths.plugins) / self._plugin_checksum(plugin_path)
         self.workload.mkdir(f"{path}")
         self.workload.exec(["chown", "-R", f"{USER}:{GROUP}", f"{path}"])
         return path
@@ -69,25 +75,18 @@ class ConnectManager:
 
         self.workload.exec(["tar", f"-{opts}", str(src_path), "-C", str(dst_path)])
 
-    def init_plugin_path(self) -> bool:
-        """Creates `PLUGIN_PATH` folder if not existent, returns False if not successful."""
-        if os.path.exists(PLUGIN_PATH):
-            return True
-
-        try:
-            self.workload.mkdir(f"{PLUGIN_PATH}")
-            return True
-        except FileNotFoundError:
-            pass
-
-        return False
+    def init_plugin_path(self) -> None:
+        """Initiates `PLUGIN_PATH` folder and sets correct ownership and permissions."""
+        self.workload.mkdir(self.workload.paths.plugins)
+        self.workload.exec(["chmod", "-R", "750", f"{self.workload.paths.plugins}"])
+        self.workload.exec(["chown", "-R", f"{USER}:{GROUP}", f"{self.workload.paths.plugins}"])
 
     def reload_plugins(self) -> None:
         """Reloads the local `plugins_cache`."""
         try:
             self._plugins_cache = {
                 f.name
-                for f in os.scandir(PLUGIN_PATH)
+                for f in os.scandir(self.workload.paths.plugins)
                 if f.is_dir() and not f.name.startswith(".")
             }
         except FileNotFoundError:  # possibly since plugins folder not created yet.
@@ -106,7 +105,12 @@ class ConnectManager:
 
     def ping_connect_api(self) -> requests.Response:
         """Makes a GET request to the unit's Connect API Endpoint and returns the response."""
-        return requests.get(self.context.rest_uri, timeout=self.REQUEST_TIMEOUT, verify=False)
+        auth = HTTPBasicAuth(
+            self.context.peer_workers.ADMIN_USERNAME, self.context.peer_workers.admin_password
+        )
+        return requests.get(
+            self.context.rest_uri, timeout=self.REQUEST_TIMEOUT, auth=auth, verify=False
+        )
 
     @retry(
         wait=wait_fixed(3),

@@ -5,17 +5,21 @@
 import re
 import socket
 from contextlib import closing
+from dataclasses import dataclass
 from pathlib import Path
 
 import requests
 import yaml
 from ops.model import Unit
 from pytest_operator.plugin import OpsTest
+from requests.auth import HTTPBasicAuth
 
-from literals import DEFAULT_API_PORT
+from core.models import PeerWorkersContext
+from literals import CONFIG_DIR, DEFAULT_API_PORT
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
+PASSWORDS_PATH = f"{CONFIG_DIR}/connect.password"
 KAFKA_APP = "kafka"
 KAFKA_CHANNEL = "3/edge"
 MYSQL_APP = "mysql"
@@ -29,6 +33,13 @@ S3_CONNECTOR_LINK = "https://github.com/Aiven-Open/cloud-storage-connectors-for-
 S3_CONNECTOR_CLASS = "io.aiven.kafka.connect.s3.AivenKafkaConnectS3SinkConnector"
 
 
+@dataclass
+class CommandResult:
+    return_code: int | None
+    stdout: str
+    stderr: str
+
+
 def check_socket(host: str | None, port: int) -> bool:
     """Checks whether IPv4 socket is up or not."""
     if host is None:
@@ -36,6 +47,16 @@ def check_socket(host: str | None, port: int) -> bool:
 
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         return sock.connect_ex((host, port)) == 0
+
+
+async def run_command_on_unit(
+    ops_test: OpsTest, unit: Unit, command: str | list[str]
+) -> CommandResult:
+    """Runs a command on a given unit and returns the result."""
+    command_args = command.split() if isinstance(command, str) else command
+    return_code, stdout, stderr = await ops_test.juju("ssh", f"{unit.name}", *command_args)
+
+    return CommandResult(return_code=return_code, stdout=stdout, stderr=stderr)
 
 
 async def get_unit_ipv4_address(ops_test: OpsTest, unit: Unit) -> str | None:
@@ -66,12 +87,28 @@ async def check_connect_endpoints_status(
     return status
 
 
+async def get_admin_password(ops_test: OpsTest, unit: Unit) -> str:
+    """Get admin user's password of a unit by reading credentials file."""
+    res = await run_command_on_unit(ops_test, unit, f"sudo cat {PASSWORDS_PATH}")
+    raw = res.stdout.strip().split("\n")
+
+    if not raw:
+        raise Exception(f"Unable to read the credentials file on unit {unit.name}.")
+
+    for line in raw:
+        if line.startswith(PeerWorkersContext.ADMIN_USERNAME):
+            return line.split(":")[-1].strip()
+
+    raise Exception(f"Admin user not defined in the credentials file on unit {unit.name}.")
+
+
 async def make_connect_api_request(
     ops_test: OpsTest,
     unit: Unit | None = None,
     method: str = "GET",
     endpoint: str = "",
     proto: str = "http",
+    auth_enabled: bool = True,
     verbose: bool = True,
     **kwargs,
 ) -> requests.Response:
@@ -83,6 +120,7 @@ async def make_connect_api_request(
         method (str, optional): Request method. Defaults to "GET".
         endpoint (str, optional): Connect API endpoint. Defaults to "".
         proto (str, optional): Connect API Protocol: "http" or "https". Defaults to "http".
+        auth_enabled (bool, optional): Whether should use authentication on the endpoint, defaults to True.
         verbose (bool, optional): Enable verbose logging. Defaults to True.
         kwargs: Keyword arguments which will be passed to `requests.request` method.
 
@@ -94,10 +132,16 @@ async def make_connect_api_request(
     unit_ip = await get_unit_ipv4_address(ops_test, target_unit)
     url = f"{proto}://{unit_ip}:{DEFAULT_API_PORT}/{endpoint}"
 
-    response = requests.request(method, url, **kwargs)
+    admin_password = await get_admin_password(ops_test, unit=target_unit)
+
+    auth = (
+        HTTPBasicAuth(PeerWorkersContext.ADMIN_USERNAME, admin_password) if auth_enabled else None
+    )
+
+    response = requests.request(method, url, auth=auth, **kwargs)
 
     if verbose:
-        print(f"{method} - {url}: {response.json()}")
+        print(f"{method} - {url}: {response.content}")
 
     return response
 

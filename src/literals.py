@@ -24,16 +24,19 @@ SUBSTRATE = "vm"
 USER = 584788
 GROUP = "root"
 
-GROUP_ID = "connect-cluster"
-DEFAULT_SECURITY_MECHANISM = "SCRAM-SHA-512"
-DEFAULT_CONVERTER_CLASS = "org.apache.kafka.connect.json.JsonConverter"
-DEFAULT_API_PROTOCOL = "http"
 DEFAULT_API_PORT = 8083
+DEFAULT_API_PROTOCOL = "http"
+DEFAULT_AUTH_CLASS = (
+    "org.apache.kafka.connect.rest.basic.auth.extension.BasicAuthSecurityRestExtension"
+)
+DEFAULT_CONVERTER_CLASS = "org.apache.kafka.connect.json.JsonConverter"
+DEFAULT_SECURITY_MECHANISM = "SCRAM-SHA-512"
+GROUP_ID = "connect-cluster"
 
-CONFIG_PATH = f"/var/snap/{SNAP_NAME}/current/etc/connect/connect-distributed.properties"
 SERVICE_NAME = "connect-distributed"
 PLUGIN_RESOURCE_KEY = "connect-plugin"
 PLUGIN_PATH = f"/var/snap/{SNAP_NAME}/common/var/lib/connect/plugins/"
+CONFIG_DIR = f"/var/snap/{SNAP_NAME}/current/etc/connect"
 
 TOPICS = {"offset": "connect-offset", "config": "connect-config", "status": "connect-status"}
 REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
@@ -65,6 +68,7 @@ class Status(Enum):
     """Collection of possible statuses for the charm."""
 
     SNAP_NOT_INSTALLED = StatusLevel(BlockedStatus(f"unable to install {SNAP_NAME} snap"), "ERROR")
+    INSTALLING = StatusLevel(WaitingStatus(f"Installing {SNAP_NAME}"), "DEBUG")
     MISSING_KAFKA = StatusLevel(BlockedStatus("Application needs Kafka client relation"), "DEBUG")
     NO_KAFKA_CREDENTIALS = StatusLevel(
         WaitingStatus("Waiting for Kafka cluster credentials"), "DEBUG"

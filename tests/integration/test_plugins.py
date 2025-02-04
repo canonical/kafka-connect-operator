@@ -63,7 +63,10 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
     )
 
     await ops_test.model.add_relation(APP_NAME, KAFKA_APP)
-    await ops_test.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP, MYSQL_APP], timeout=1800)
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[APP_NAME, KAFKA_APP, MYSQL_APP], idle_period=30, timeout=1800
+        )
 
     assert ops_test.model.applications[APP_NAME].status == "active"
     assert ops_test.model.applications[MYSQL_APP].status == "active"
