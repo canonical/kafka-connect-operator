@@ -2,11 +2,13 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import json
 import re
 import socket
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
+from subprocess import PIPE, check_output
 
 import requests
 import yaml
@@ -102,25 +104,29 @@ async def get_admin_password(ops_test: OpsTest, unit: Unit) -> str:
     raise Exception(f"Admin user not defined in the credentials file on unit {unit.name}.")
 
 
-async def make_connect_api_request(
+async def make_api_request(
     ops_test: OpsTest,
     unit: Unit | None = None,
     method: str = "GET",
     endpoint: str = "",
     proto: str = "http",
+    port: int = DEFAULT_API_PORT,
     auth_enabled: bool = True,
+    custom_auth: tuple[str, str] | None = None,
     verbose: bool = True,
     **kwargs,
 ) -> requests.Response:
-    """Makes a request to Kafka Connect API and returns the response.
+    """Makes a request to a REST Endpoint and returns the response.
 
     Args:
         ops_test (OpsTest): OpsTest object
-        unit (Unit, optional): Connect worker unit used to make the request; if not supplied, uses the first unit in the Kafka Connect application `APP_NAME`.
+        unit (Unit, optional): Unit used to make the request; if not supplied, uses the first unit in the Kafka Connect application `APP_NAME`.
         method (str, optional): Request method. Defaults to "GET".
-        endpoint (str, optional): Connect API endpoint. Defaults to "".
-        proto (str, optional): Connect API Protocol: "http" or "https". Defaults to "http".
+        endpoint (str, optional): API endpoint. Defaults to "".
+        proto (str, optional): HTTP Protocol: "http" or "https". Defaults to "http".
+        port (int, optional): TCP Port. defaults to `DEFAULT_API_PORT`.
         auth_enabled (bool, optional): Whether should use authentication on the endpoint, defaults to True.
+        custom_auth (tuple[str, str], optional): A (username, password) tuple to be used for HTTP Basic authentication.
         verbose (bool, optional): Enable verbose logging. Defaults to True.
         kwargs: Keyword arguments which will be passed to `requests.request` method.
 
@@ -130,13 +136,16 @@ async def make_connect_api_request(
     target_unit = ops_test.model.applications[APP_NAME].units[0] if unit is None else unit
 
     unit_ip = await get_unit_ipv4_address(ops_test, target_unit)
-    url = f"{proto}://{unit_ip}:{DEFAULT_API_PORT}/{endpoint}"
+    url = f"{proto}://{unit_ip}:{port}/{endpoint}"
 
-    admin_password = await get_admin_password(ops_test, unit=target_unit)
-
-    auth = (
-        HTTPBasicAuth(PeerWorkersContext.ADMIN_USERNAME, admin_password) if auth_enabled else None
-    )
+    auth = None
+    if auth_enabled:
+        admin_password = await get_admin_password(ops_test, unit=target_unit)
+        auth = (
+            HTTPBasicAuth(PeerWorkersContext.ADMIN_USERNAME, admin_password)
+            if not custom_auth
+            else HTTPBasicAuth(*custom_auth)
+        )
 
     response = requests.request(method, url, auth=auth, **kwargs)
 
@@ -144,6 +153,9 @@ async def make_connect_api_request(
         print(f"{method} - {url}: {response.content}")
 
     return response
+
+
+make_connect_api_request = make_api_request
 
 
 def download_file(url: str, dst_path: str):
@@ -175,3 +187,31 @@ def build_mysql_db_init_queries(
 
     queries = [query.strip().replace("\n", " ") for query in raw.split(";")]
     return [query for query in queries if query]
+
+
+def search_secrets(ops_test: OpsTest, owner: str, search_key: str) -> str:
+    """Searches secrets for a provided `search_key` and returns it if found, otherwise return empty string."""
+    secrets_meta_raw = check_output(
+        f"JUJU_MODEL={ops_test.model_full_name} juju list-secrets --format json",
+        stderr=PIPE,
+        shell=True,
+        universal_newlines=True,
+    ).strip()
+    secrets_meta = json.loads(secrets_meta_raw)
+
+    for secret_id in secrets_meta:
+        if owner and not secrets_meta[secret_id]["owner"] == owner:
+            continue
+
+        secrets_data_raw = check_output(
+            f"JUJU_MODEL={ops_test.model_full_name} juju show-secret --format json --reveal {secret_id}",
+            stderr=PIPE,
+            shell=True,
+            universal_newlines=True,
+        )
+
+        secret_data = json.loads(secrets_data_raw)
+        if search_key in secret_data[secret_id]["content"]["Data"]:
+            return secret_data[secret_id]["content"]["Data"][search_key]
+
+    return ""
