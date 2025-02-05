@@ -35,10 +35,10 @@ def test_integration_requested(ctx: Context, base_state: State, active_service: 
     # When
     with ctx(ctx.on.update_status(), state_in) as mgr:
         charm = cast(ConnectCharm, mgr.charm)
-        charm.connect.connect_manager = connect_manager_mock
+        charm.connect_manager = connect_manager_mock
         charm.auth_manager = auth_manager_mock
 
-        charm.connect._on_integration_requested(event)
+        charm.connect.provider._on_integration_requested(event)
         state_out = mgr.run()
 
     # Then
@@ -74,7 +74,7 @@ def test_provider_on_relation_changed(
     # When
     with ctx(ctx.on.relation_changed(client_rel), state_in) as mgr:
         charm = cast(ConnectCharm, mgr.charm)
-        charm.connect.connect_manager = connect_manager_mock
+        charm.connect_manager = connect_manager_mock
         charm.auth_manager = auth_manager_mock
         state_out = mgr.run()
 
@@ -109,7 +109,7 @@ def test_provider_on_relation_joined(ctx: Context, base_state: State, active_ser
     # When
     with ctx(ctx.on.relation_joined(client_rel), state_in) as mgr:
         charm = cast(ConnectCharm, mgr.charm)
-        charm.connect.connect_manager = connect_manager_mock
+        charm.connect_manager = connect_manager_mock
         state_out = mgr.run()
 
     # Then
@@ -138,7 +138,7 @@ def test_provider_on_relation_broken(ctx: Context, base_state: State, active_ser
     # When
     with ctx(ctx.on.relation_broken(client_rel), state_in) as mgr:
         charm = cast(ConnectCharm, mgr.charm)
-        charm.connect.connect_manager = connect_manager_mock
+        charm.connect_manager = connect_manager_mock
         charm.auth_manager = auth_manager_mock
         state_out = mgr.run()
 
