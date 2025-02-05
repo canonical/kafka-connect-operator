@@ -26,6 +26,7 @@ from literals import (
 )
 from managers.auth import AuthManager
 from managers.config import ConfigManager
+from managers.connect import ConnectManager
 from workload import Workload
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.config_manager = ConfigManager(
             context=self.context, workload=self.workload, config=self.config
         )
+        self.connect_manager = ConnectManager(context=self.context, workload=self.workload)
 
         self.framework.observe(getattr(self.on, "install"), self._on_install)
         self.framework.observe(getattr(self.on, "start"), self._on_start)
