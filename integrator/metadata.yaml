@@ -1,0 +1,35 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: kafka-connect-integrator
+display-name: Apache Kafka Connect Integrator
+description: |
+  Description
+summary: Apache Kafka Connect Integrator
+docs: https://discourse.charmhub.io/t/charmed-kafka-documentation/10288
+source: https://github.com/canonical/kafka-connect-operator
+issues: https://github.com/canonical/kafka-connect-operator/issues
+website:
+  - https://github.com/canonical/kafka-connect-operator
+maintainers:
+  - Canonical Data Platform <data-platform@lists.launchpad.net>
+series:
+  - jammy
+
+peers:
+  peer:
+    interface: peer
+
+requires:
+  source:
+    interface: connect_client
+    optional: true
+    limit: 1
+  sink:
+    interface: connect_client
+    optional: true
+    limit: 1
+
+resources:
+  connect-plugin:
+    type: file
+    filename: "plugin.tar"

@@ -58,6 +58,11 @@ class AuthManager:
         cache = self._load_credentials() | credentials
         self._save_credentials(cache)
 
+    def remove_user(self, username: str) -> None:
+        """Removes a username from the internal file store."""
+        cache = {u: p for u, p in self.credentials.items() if u != username}
+        self._save_credentials(cache)
+
     @property
     def credentials(self) -> dict[str, str]:
         """Returns a dict mapping of username: password."""

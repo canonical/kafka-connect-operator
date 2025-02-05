@@ -1,0 +1,153 @@
+import dataclasses
+import logging
+from typing import cast
+from unittest.mock import MagicMock
+
+import pytest
+from charms.data_platform_libs.v0.data_interfaces import IntegrationRequestedEvent
+from ops.testing import Context, PeerRelation, Relation, State
+from src.charm import ConnectCharm
+from src.literals import CLIENT_REL, PEER_REL, Status
+
+logger = logging.getLogger(__name__)
+
+
+def test_integration_requested(ctx: Context, base_state: State, active_service: MagicMock) -> None:
+    """Checks the `integration_requested` event triggers creation of credentials on the provider side."""
+    # Given
+    relation_id = 7
+    state_in = base_state
+    client_rel = Relation(
+        CLIENT_REL,
+        CLIENT_REL,
+        id=relation_id,
+        remote_app_data={"plugin-url": "http://10.10.10.10:8080"},
+    )
+    peer_rel = PeerRelation(PEER_REL, PEER_REL)
+    event = IntegrationRequestedEvent(
+        handle=MagicMock(), relation=client_rel  # pyright: ignore[reportArgumentType]
+    )
+    connect_manager_mock = MagicMock()
+    auth_manager_mock = MagicMock()
+
+    state_in = dataclasses.replace(base_state, relations=[peer_rel, client_rel])
+
+    # When
+    with ctx(ctx.on.update_status(), state_in) as mgr:
+        charm = cast(ConnectCharm, mgr.charm)
+        charm.connect.connect_manager = connect_manager_mock
+        charm.auth_manager = auth_manager_mock
+
+        charm.connect._on_integration_requested(event)
+        state_out = mgr.run()
+
+    # Then
+    assert client_rel.local_app_data.get("username") == f"relation-{relation_id}"
+    assert client_rel.local_app_data.get("password")
+    assert connect_manager_mock.restart_worker.call_count == 1
+    assert auth_manager_mock.update.call_count == 1
+    assert state_out.unit_status == Status.MISSING_KAFKA.value.status
+
+
+@pytest.mark.parametrize("is_leader", [True, False])
+@pytest.mark.parametrize("initial_data", [{}, {"username": "relation-7", "password": "password"}])
+def test_provider_on_relation_changed(
+    ctx: Context, base_state: State, is_leader: bool, initial_data: dict, active_service: MagicMock
+) -> None:
+    """Checks `realtion_changed` event handling logic based on leadership status and whether credentials has been created on the leader or not."""
+    # Given
+    relation_id = 7
+    state_in = base_state
+    client_rel = Relation(
+        CLIENT_REL,
+        CLIENT_REL,
+        id=relation_id,
+        remote_app_data={"plugin-url": "http://10.10.10.10:8080"},
+        remote_units_data={0: initial_data},
+    )
+    peer_rel = PeerRelation(PEER_REL, PEER_REL)
+    connect_manager_mock = MagicMock()
+    auth_manager_mock = MagicMock()
+
+    state_in = dataclasses.replace(base_state, relations=[peer_rel, client_rel], leader=is_leader)
+
+    # When
+    with ctx(ctx.on.relation_changed(client_rel), state_in) as mgr:
+        charm = cast(ConnectCharm, mgr.charm)
+        charm.connect.connect_manager = connect_manager_mock
+        charm.auth_manager = auth_manager_mock
+        state_out = mgr.run()
+
+    if not is_leader or not initial_data:
+        assert len(state_out.deferred) == 1
+    else:
+        assert len(state_out.deferred) == 0
+        assert connect_manager_mock.restart_worker.call_count > 0
+        assert auth_manager_mock.update.call_count > 0
+
+    # Then
+    assert state_out.unit_status == Status.MISSING_KAFKA.value.status
+
+
+def test_provider_on_relation_joined(ctx: Context, base_state: State, active_service) -> None:
+    """Checks `realtion_joined` event leads to loading of plugins on the provider side."""
+    # Given
+    relation_id = 7
+    plugin_url = "http://10.10.10.10:8080"
+    state_in = base_state
+    client_rel = Relation(
+        CLIENT_REL,
+        CLIENT_REL,
+        id=relation_id,
+        remote_app_data={"plugin-url": plugin_url},
+    )
+    peer_rel = PeerRelation(PEER_REL, PEER_REL)
+    connect_manager_mock = MagicMock()
+
+    state_in = dataclasses.replace(base_state, relations=[peer_rel, client_rel], leader=False)
+
+    # When
+    with ctx(ctx.on.relation_joined(client_rel), state_in) as mgr:
+        charm = cast(ConnectCharm, mgr.charm)
+        charm.connect.connect_manager = connect_manager_mock
+        state_out = mgr.run()
+
+    # Then
+    assert connect_manager_mock.load_plugin_from_url.call_count == 1
+    assert plugin_url in connect_manager_mock.load_plugin_from_url.call_args.args
+    assert state_out.unit_status == Status.MISSING_KAFKA.value.status
+
+
+def test_provider_on_relation_broken(ctx: Context, base_state: State, active_service) -> None:
+    """Checks on `relation_broken` all related credentials and plugins are removed from the provider."""
+    # Given
+    relation_id = 7
+    state_in = base_state
+    client_rel = Relation(
+        CLIENT_REL,
+        CLIENT_REL,
+        id=relation_id,
+        remote_app_data={"plugin-url": "http://10.10.10.10:8080"},
+    )
+    peer_rel = PeerRelation(PEER_REL, PEER_REL)
+    connect_manager_mock = MagicMock()
+    auth_manager_mock = MagicMock()
+
+    state_in = dataclasses.replace(base_state, relations=[peer_rel, client_rel])
+
+    # When
+    with ctx(ctx.on.relation_broken(client_rel), state_in) as mgr:
+        charm = cast(ConnectCharm, mgr.charm)
+        charm.connect.connect_manager = connect_manager_mock
+        charm.auth_manager = auth_manager_mock
+        state_out = mgr.run()
+
+    # Then
+    assert connect_manager_mock.remove_plugin.call_count == 1
+    assert (
+        connect_manager_mock.remove_plugin.call_args.kwargs["path_prefix"]
+        == f"relation-{relation_id}"
+    )
+    assert auth_manager_mock.remove_user.call_count == 1
+    assert f"relation-{relation_id}" in auth_manager_mock.remove_user.call_args.args
+    assert state_out.unit_status == Status.MISSING_KAFKA.value.status

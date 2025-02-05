@@ -10,15 +10,20 @@ from typing import TYPE_CHECKING
 from charms.data_platform_libs.v0.data_interfaces import (
     Data,
     DataPeerData,
+    DataPeerOtherUnitData,
     DataPeerUnitData,
+    KafkaConnectProviderData,
     KafkaRequirerData,
+    ProviderData,
     RequirerData,
 )
 from ops import Object
-from ops.model import Application, Relation, Unit
+from ops.model import Application, Relation, RelationDataAccessError, Unit
 from typing_extensions import override
 
 from literals import (
+    CLIENT_REL,
+    DEFAULT_API_PORT,
     DEFAULT_SECURITY_MECHANISM,
     KAFKA_CLIENT_REL,
     PEER_REL,
@@ -80,6 +85,23 @@ class RelationContext(WithStatus):
         self.relation_data.update(update_content)
         for field in delete_fields:
             del self.relation_data[field]
+
+    def _fetch_from_secrets(self, field) -> str:
+        """Fetches a field from secrets defined at the remote unit of the relation."""
+        if not self.relation or not self.relation.units:
+            return ""
+
+        remote_unit = next(iter(self.relation.units))
+
+        try:
+            return self.data_interface._fetch_relation_data_with_secrets(
+                remote_unit, [field], self.relation
+            ).get(field, "")
+        except RelationDataAccessError:
+            # remote unit has not the secrets yet.
+            pass
+
+        return ""
 
 
 class KafkaClientContext(RelationContext):
@@ -151,6 +173,46 @@ class KafkaClientContext(RelationContext):
         return Status.ACTIVE
 
 
+class ConnectClientContext(RelationContext):
+    """Context collection metadata for kafka-client relation."""
+
+    def __init__(
+        self,
+        relation: Relation | None,
+        data_interface: ProviderData,
+    ):
+        super().__init__(relation, data_interface, None)
+
+    @property
+    def plugin_url(self) -> str:
+        """Returns the client's plugin-url REST endpoint."""
+        if not self.relation:
+            return ""
+
+        return self.relation_data.get("plugin-url", "")
+
+    @property
+    def username(self) -> str:
+        """Returns the Kafka client username."""
+        if not self.relation:
+            return ""
+
+        return f"relation-{self.relation.id}"
+
+    @property
+    def password(self) -> str:
+        """Returns the Kafka client password."""
+        if not self.relation:
+            return ""
+
+        return self._fetch_from_secrets("password")
+
+    @property
+    @override
+    def status(self) -> Status:
+        return Status.ACTIVE
+
+
 class WorkerUnitContext(RelationContext):
     """Context collection metadata for a single Kafka Connect worker unit."""
 
@@ -187,6 +249,15 @@ class WorkerUnitContext(RelationContext):
     @override
     def status(self) -> Status:
         return Status.ACTIVE
+
+    def get_rest_endpoint(self, protocol: str = "http", port: int = DEFAULT_API_PORT) -> str:
+        """Returns the REST endpoint of the unit.
+
+        Args:
+            protocol (str, optional): REST protocol. Defaults to "http".
+            port (int, optional): REST port. Defaults to DEFAULT_API_PORT.
+        """
+        return f"{protocol}://{self.internal_address}:{port}"
 
 
 class PeerWorkersContext(RelationContext):
@@ -234,6 +305,37 @@ class Context(WithStatus, Object):
             topic=TOPICS["offset"],
             extra_user_roles="admin",
         )
+        self.connect_provider_interface = KafkaConnectProviderData(
+            self.model, relation_name=CLIENT_REL
+        )
+
+    @property
+    def peer_relation(self) -> Relation | None:
+        """The Kafka connect workers peer relation."""
+        return self.model.get_relation(PEER_REL)
+
+    @property
+    def units(self) -> dict[Unit, WorkerUnitContext]:
+        """Returns a mapping of unit to the WorkerUnitContext for peer units."""
+        _map = {self.model.unit: self.worker_unit}
+
+        if not self.peer_relation or not self.peer_relation.units:
+            return _map
+
+        _map.update(
+            {
+                unit: WorkerUnitContext(
+                    relation=self.peer_relation,
+                    data_interface=DataPeerOtherUnitData(
+                        model=self.model, unit=unit, relation_name=PEER_REL
+                    ),
+                    component=unit,
+                )
+                for unit in self.peer_relation.units
+            }
+        )
+
+        return _map
 
     @property
     def kafka_client(self) -> KafkaClientContext:
@@ -260,6 +362,11 @@ class Context(WithStatus, Object):
         )
 
     @property
+    def client_relations(self) -> set[Relation]:
+        """The relations of all client applications."""
+        return set(self.model.relations[CLIENT_REL])
+
+    @property
     def tls_enabled(self) -> bool:
         """Returns True if TLS is enabled."""
         # TODO: fix after tls support is added
@@ -277,8 +384,44 @@ class Context(WithStatus, Object):
 
     @property
     def rest_uri(self) -> str:
-        """Returns the REST API base URI."""
-        return f"{self.rest_protocol}://{self.worker_unit.internal_address}:{self.rest_port}"
+        """Returns the REST API base URI of current unit."""
+        return self.worker_unit.get_rest_endpoint(protocol=self.rest_protocol, port=self.rest_port)
+
+    @property
+    def rest_endpoints(self) -> str:
+        """Returns all Kafka Connect REST endpoints available on the cluster."""
+        return ",".join(
+            [
+                unit_context.get_rest_endpoint(protocol=self.rest_protocol, port=self.rest_port)
+                for unit_context in self.units.values()
+            ]
+        )
+
+    @property
+    def clients(self) -> dict[int, ConnectClientContext]:
+        """Returns a mapping of integrator relation-id to the related client context."""
+        clients = {}
+        for relation in self.client_relations:
+            if not relation.app:
+                continue
+
+            clients[relation.id] = ConnectClientContext(
+                relation=relation, data_interface=self.connect_provider_interface
+            )
+
+        return clients
+
+    @property
+    def credentials(self) -> dict[str, str]:
+        """Returns a dict of all active `username: password`s on the Kafka Connect cluster."""
+        cache = {}
+        if self.peer_workers.admin_password:
+            cache[self.peer_workers.ADMIN_USERNAME] = self.peer_workers.admin_password
+
+        for client in self.clients.values():
+            cache[client.username] = client.password
+
+        return cache
 
     @property
     @override
