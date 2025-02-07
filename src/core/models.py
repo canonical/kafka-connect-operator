@@ -200,6 +200,14 @@ class ConnectClientContext(RelationContext):
         return f"relation-{self.relation.id}"
 
     @property
+    def endpoints(self) -> str:
+        """Returns Kafka Connect endpoints set for the client."""
+        if not self.relation:
+            return ""
+
+        return self.relation_data.get("endpoints", "")
+
+    @property
     def password(self) -> str:
         """Returns the Kafka client password."""
         if not self.relation:
@@ -244,6 +252,19 @@ class WorkerUnitContext(RelationContext):
             addr = f"{self.unit.name.split('/')[0]}-{self.unit_id}.{self.unit.name.split('/')[0]}-endpoints"
 
         return addr
+
+    @property
+    def should_restart(self) -> bool:
+        """Determines whether a restart of service is required or not."""
+        if not self.relation:
+            return False
+
+        return self.relation_data.get("restart", False) == "true"
+
+    @should_restart.setter
+    def should_restart(self, value: bool) -> None:
+        _val = "true" if value else "false"
+        self.update({"restart": _val})
 
     @property
     @override

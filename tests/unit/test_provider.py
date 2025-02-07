@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from charms.data_platform_libs.v0.data_interfaces import IntegrationRequestedEvent
-from ops.testing import Context, PeerRelation, Relation, State
+from ops.testing import Context, PeerRelation, Relation, Secret, State
 from src.charm import ConnectCharm
 from src.literals import CLIENT_REL, PEER_REL, Status
 
@@ -44,7 +44,7 @@ def test_integration_requested(ctx: Context, base_state: State, active_service: 
     # Then
     assert client_rel.local_app_data.get("username") == f"relation-{relation_id}"
     assert client_rel.local_app_data.get("password")
-    assert connect_manager_mock.restart_worker.call_count == 1
+    assert peer_rel.local_unit_data.get("restart") == "true"
     assert auth_manager_mock.update.call_count == 1
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
 
@@ -58,18 +58,24 @@ def test_provider_on_relation_changed(
     # Given
     relation_id = 7
     state_in = base_state
+    secret = Secret(
+        label=f"connect-client.{relation_id}.user.secret",
+        tracked_content=initial_data,
+    )
     client_rel = Relation(
         CLIENT_REL,
         CLIENT_REL,
         id=relation_id,
         remote_app_data={"plugin-url": "http://10.10.10.10:8080"},
-        remote_units_data={0: initial_data},
+        remote_units_data={0: {"secret-user": secret.id, **initial_data}},
     )
     peer_rel = PeerRelation(PEER_REL, PEER_REL)
     connect_manager_mock = MagicMock()
     auth_manager_mock = MagicMock()
 
-    state_in = dataclasses.replace(base_state, relations=[peer_rel, client_rel], leader=is_leader)
+    state_in = dataclasses.replace(
+        base_state, relations=[peer_rel, client_rel], leader=is_leader, secrets=[secret]
+    )
 
     # When
     with ctx(ctx.on.relation_changed(client_rel), state_in) as mgr:
@@ -78,14 +84,13 @@ def test_provider_on_relation_changed(
         charm.auth_manager = auth_manager_mock
         state_out = mgr.run()
 
-    if not is_leader or not initial_data:
-        assert len(state_out.deferred) == 1
-    else:
-        assert len(state_out.deferred) == 0
-        assert connect_manager_mock.restart_worker.call_count > 0
+    # Then
+    if initial_data:
+        assert peer_rel.local_unit_data.get("restart") == "true"
+        assert charm.context.clients[relation_id].password == "password"
         assert auth_manager_mock.update.call_count > 0
 
-    # Then
+    assert len(state_out.deferred) == 1 + int(is_leader)
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
 
 

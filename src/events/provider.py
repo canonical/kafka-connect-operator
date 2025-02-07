@@ -5,7 +5,6 @@
 """Event Handler for Connect Client Provider events."""
 
 import logging
-from subprocess import CalledProcessError
 from typing import TYPE_CHECKING
 
 from charms.data_platform_libs.v0.data_interfaces import (
@@ -59,6 +58,14 @@ class ConnectProvider(Object):
             event.defer()
             return
 
+        if not client.plugin_url:
+            event.defer()
+            return
+
+        self.charm.connect_manager.load_plugin_from_url(
+            client.plugin_url, path_prefix=client.username
+        )
+
         if not self.charm.unit.is_leader():
             return
 
@@ -74,8 +81,8 @@ class ConnectProvider(Object):
         # update credentials
         self.charm.auth_manager.update(credentials={client.username: client.password})
 
-        # TODO: rolling restart maybe?
-        self.charm.connect_manager.restart_worker()
+        self.context.worker_unit.should_restart = True
+        self.charm.on.config_changed.emit()
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handler for `connect-client-relation-changed` event."""
@@ -85,35 +92,20 @@ class ConnectProvider(Object):
             event.defer()
             return
 
-        if self.charm.unit.is_leader():
-            self.context.connect_provider_interface.set_endpoints(
-                event.relation.id, self.context.rest_endpoints
-            )
-
         self.charm.auth_manager.update(credentials=self.context.credentials)
 
-        # TODO: rolling restart maybe?
-        self.charm.connect_manager.restart_worker()
+        self.context.worker_unit.should_restart = True
+        self.charm.on.config_changed.emit()
 
     def _on_relation_joined(self, _: RelationJoinedEvent) -> None:
         """Handler for `connect-client-relation-joined` event."""
-        # No need to add users here since it's handled in `config-changed` for newcomers, and `relation-changed` for existing units
-        for client in self.context.clients.values():
-            try:
-                self.charm.connect_manager.load_plugin_from_url(
-                    client.plugin_url, path_prefix=client.username
-                )
-            except CalledProcessError as e:
-                if "File exists" in e.stderr:
-                    continue
-                raise e
-
-        self.charm.connect_manager.restart_worker()
+        self.charm.on.config_changed.emit()
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handler for `connect-client-relation-broken` event."""
         username = f"relation-{event.relation.id}"
         self.charm.auth_manager.remove_user(username)
         self.charm.connect_manager.remove_plugin(path_prefix=username)
-        # TODO: rolling restart maybe?
-        self.charm.connect_manager.restart_worker()
+
+        self.context.worker_unit.should_restart = True
+        self.charm.on.config_changed.emit()
