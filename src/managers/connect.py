@@ -7,8 +7,10 @@
 import glob
 import logging
 import os
+import re
 import tempfile
 from pathlib import Path
+from subprocess import CalledProcessError
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -51,6 +53,16 @@ class ConnectManager:
     def plugin_path_initiated(self) -> bool:
         """Checks whether plugin path is initiated or not."""
         return os.path.exists(self.workload.paths.plugins)
+
+    @property
+    def loaded_client_plugins(self) -> set:
+        """Returns a set of client usernames for which the client plugin is loaded on this worker."""
+        self.reload_plugins()
+        cache: set = set()
+        for plugin in self.plugins_cache:
+            if match := re.search(r"relation-[0-9]+", plugin):
+                cache.add(match.group())
+        return cache
 
     def _plugin_checksum(self, plugin_path: Path) -> str:
         """Calculates checksum of a plugin, currently uses SHA-256 algorithm."""
@@ -118,10 +130,15 @@ class ConnectManager:
 
     def load_plugin_from_url(self, plugin_url: str, path_prefix: str = "") -> None:
         """Loads a plugin from a given `plugin_url` to the `PLUGIN_PATH` folder, skips if previously loaded."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "plugin.tar"
-            self._download_plugin(plugin_url, f"{path}")
-            self.load_plugin(path, path_prefix=path_prefix)
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                path = Path(tmp_dir) / "plugin.tar"
+                self._download_plugin(plugin_url, f"{path}")
+                self.load_plugin(path, path_prefix=path_prefix)
+        except CalledProcessError as e:
+            if "File exists" in e.stderr:
+                return
+            raise e
 
     def remove_plugin(self, path_prefix: str) -> None:
         """Removes plugins for which the plugin-path starts with `path_prefix`."""
@@ -159,4 +176,6 @@ class ConnectManager:
 
     def restart_worker(self) -> None:
         """Attempts to restart the connect worker."""
+        logger.info("Restarting worker service.")
+        self.context.worker_unit.should_restart = False
         self.workload.restart()

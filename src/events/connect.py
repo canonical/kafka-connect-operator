@@ -14,7 +14,7 @@ from ops.charm import (
 from ops.framework import EventBase, Object
 
 from events.provider import ConnectProvider
-from literals import PLUGIN_RESOURCE_KEY, Status
+from literals import PEER_REL, PLUGIN_RESOURCE_KEY, Status
 
 if TYPE_CHECKING:
     from charm import ConnectCharm
@@ -34,6 +34,7 @@ class ConnectHandler(Object):
 
         self.framework.observe(getattr(self.charm.on, "update_status"), self._update_status)
         self.framework.observe(getattr(self.charm.on, "config_changed"), self._on_config_changed)
+        self.framework.observe(self.charm.on[PEER_REL].relation_changed, self._on_config_changed)
 
         # instantiate the provider
         self.provider = ConnectProvider(self.charm)
@@ -46,6 +47,12 @@ class ConnectHandler(Object):
             self.charm._set_status(Status.SERVICE_NOT_RUNNING)
         else:
             self.charm._set_status(self.context.status)
+
+        if isinstance(event, ConfigChangedEvent):
+            return
+
+        # for plugins update if needed
+        self.charm.on.config_changed.emit()
 
     def _on_config_changed(self, event: ConfigChangedEvent):
         """Handler for `config-changed` event."""
@@ -63,10 +70,13 @@ class ConnectHandler(Object):
                 f"Resource {PLUGIN_RESOURCE_KEY} not found or could not be downloaded, skipping plugin loading."
             )
 
+        self.update_plugins()
+        self.update_clients_data()
+
         current_config = set(self.charm.workload.read(self.workload.paths.worker_properties))
         diff = set(self.charm.config_manager.properties) ^ current_config
 
-        if not diff and not resource_path:
+        if not diff and not resource_path and not self.context.worker_unit.should_restart:
             return
 
         if not self.context.ready:
@@ -91,3 +101,45 @@ class ConnectHandler(Object):
 
         # Update internal credentials store
         self.charm.auth_manager.update(credentials=self.context.credentials)
+
+    def update_clients_data(self) -> None:
+        """Updates all clients with latest relation data."""
+        if not self.charm.unit.is_leader():
+            return
+
+        for client in self.context.clients.values():
+            if not client.password:
+                logger.debug(
+                    f"Skipping update of {client.username}, user has not yet been added..."
+                )
+                continue
+
+            if set(client.endpoints.split(",")) == set(self.context.rest_endpoints.split(",")):
+                continue
+
+            client.update(
+                {
+                    "endpoints": self.context.rest_endpoints,
+                    "username": client.username,
+                    "password": client.password,
+                    # "tls": self.context.peer_workers.tls_enabled,
+                    # "tls-ca": self.context.worker_unit.tls.ca
+                }
+            )
+
+    def update_plugins(self) -> None:
+        """Attempts to update client plugins on this worker."""
+        loaded_clients = self.charm.connect_manager.loaded_client_plugins
+        update_set = set()
+
+        for client in self.context.clients.values():
+            if client.username in loaded_clients:
+                continue
+
+            self.charm.connect_manager.load_plugin_from_url(
+                client.plugin_url, path_prefix=client.username
+            )
+            update_set.add(client)
+
+        if update_set:
+            self.context.worker_unit.should_restart = True
