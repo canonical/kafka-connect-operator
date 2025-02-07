@@ -33,3 +33,7 @@ resources:
   connect-plugin:
     type: file
     filename: "plugin.tar"
+    description: |
+      Apache Kafka Connect connector plugin, which will be served by this integrator through a REST endpoint.
+      The plugin should be packed into a TAR archive, including all required Java libs and the connector implementation.
+      The archive should not contain any libraries provided by the Apache Kafka Connect runtime.
