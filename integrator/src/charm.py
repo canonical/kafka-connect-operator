@@ -106,7 +106,6 @@ class IntegratorCharm(CharmBase):
         self.workload.start()
 
         self.unit.status = ActiveStatus()
-        self.app.status = ActiveStatus()
 
     def _update_status(self, event: UpdateStatusEvent) -> None:
         if not self.workload.is_active():
@@ -114,7 +113,6 @@ class IntegratorCharm(CharmBase):
             return
 
         self.unit.status = ActiveStatus()
-        self.app.status = ActiveStatus()
 
     def _on_config_changed(self, _) -> None:
         resource_path = None
