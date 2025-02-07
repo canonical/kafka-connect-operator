@@ -109,7 +109,7 @@ class IntegratorCharm(CharmBase):
 
     def _update_status(self, event: UpdateStatusEvent) -> None:
         if not self.workload.is_active():
-            self._on_start(event)
+            self.on.start.emit()
             return
 
         self.unit.status = ActiveStatus()
