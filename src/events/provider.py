@@ -9,6 +9,7 @@ from subprocess import CalledProcessError
 from typing import TYPE_CHECKING
 
 from charms.data_platform_libs.v0.data_interfaces import (
+    IntegrationRequestedEvent,
     KafkaConnectProviderEventHandlers,
 )
 from ops.charm import (
@@ -50,7 +51,7 @@ class ConnectProvider(Object):
             self._on_integration_requested,
         )
 
-    def _on_integration_requested(self, event):
+    def _on_integration_requested(self, event: IntegrationRequestedEvent) -> None:
         """Handle the `integration_requested` event, fired after an integrator relates, boots up and sets the `plugin-url`."""
         client = self.context.clients.get(event.relation.id)
 
