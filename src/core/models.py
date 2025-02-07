@@ -315,27 +315,23 @@ class Context(WithStatus, Object):
         return self.model.get_relation(PEER_REL)
 
     @property
-    def units(self) -> dict[Unit, WorkerUnitContext]:
-        """Returns a mapping of unit to the WorkerUnitContext for peer units."""
-        _map = {self.model.unit: self.worker_unit}
+    def units(self) -> set[WorkerUnitContext]:
+        """Returns a set of peer units' WorkerUnitContext."""
+        _set = {self.worker_unit}
 
         if not self.peer_relation or not self.peer_relation.units:
-            return _map
+            return _set
 
-        _map.update(
-            {
-                unit: WorkerUnitContext(
-                    relation=self.peer_relation,
-                    data_interface=DataPeerOtherUnitData(
-                        model=self.model, unit=unit, relation_name=PEER_REL
-                    ),
-                    component=unit,
-                )
-                for unit in self.peer_relation.units
-            }
-        )
-
-        return _map
+        return _set | {
+            WorkerUnitContext(
+                relation=self.peer_relation,
+                data_interface=DataPeerOtherUnitData(
+                    model=self.model, unit=unit, relation_name=PEER_REL
+                ),
+                component=unit,
+            )
+            for unit in self.peer_relation.units
+        }
 
     @property
     def kafka_client(self) -> KafkaClientContext:
@@ -393,7 +389,7 @@ class Context(WithStatus, Object):
         return ",".join(
             [
                 unit_context.get_rest_endpoint(protocol=self.rest_protocol, port=self.rest_port)
-                for unit_context in self.units.values()
+                for unit_context in self.units
             ]
         )
 
