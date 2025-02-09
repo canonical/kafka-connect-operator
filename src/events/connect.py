@@ -15,6 +15,7 @@ from ops.framework import EventBase, Object
 
 from events.provider import ConnectProvider
 from literals import PEER_REL, PLUGIN_RESOURCE_KEY, Status
+from managers.connect import PluginDownloadFailedError
 
 if TYPE_CHECKING:
     from charm import ConnectCharm
@@ -107,11 +108,16 @@ class ConnectHandler(Object):
         if not self.charm.unit.is_leader():
             return
 
+        loaded_plugins = self.charm.connect_manager.loaded_client_plugins
+
         for client in self.context.clients.values():
             if not client.password:
                 logger.debug(
                     f"Skipping update of {client.username}, user has not yet been added..."
                 )
+                continue
+
+            if client.username not in loaded_plugins:
                 continue
 
             if set(client.endpoints.split(",")) == set(self.context.rest_endpoints.split(",")):
@@ -136,9 +142,14 @@ class ConnectHandler(Object):
             if client.username in loaded_clients:
                 continue
 
-            self.charm.connect_manager.load_plugin_from_url(
-                client.plugin_url, path_prefix=client.username
-            )
+            try:
+                self.charm.connect_manager.load_plugin_from_url(
+                    client.plugin_url, path_prefix=client.username
+                )
+            except PluginDownloadFailedError as e:
+                logger.warning(f"Unable to fetch the plugin for {client.username}: {e}")
+                continue
+
             update_set.add(client)
 
         if update_set:

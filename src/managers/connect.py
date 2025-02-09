@@ -18,6 +18,7 @@ from tenacity import (
     retry,
     retry_any,
     retry_if_exception,
+    retry_if_exception_type,
     retry_if_result,
     stop_after_attempt,
     wait_fixed,
@@ -28,6 +29,10 @@ from core.workload import WorkloadBase
 from literals import GROUP, USER
 
 logger = logging.getLogger(__name__)
+
+
+class PluginDownloadFailedError(Exception):
+    """Exception raised when plugin download fails."""
 
 
 class ConnectManager:
@@ -128,6 +133,12 @@ class ConnectManager:
         self.workload.rmdir(f"{resource_path}")
         self.reload_plugins()
 
+    @retry(
+        wait=wait_fixed(2),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(PluginDownloadFailedError),
+        reraise=True,
+    )
     def load_plugin_from_url(self, plugin_url: str, path_prefix: str = "") -> None:
         """Loads a plugin from a given `plugin_url` to the `PLUGIN_PATH` folder, skips if previously loaded."""
         try:
@@ -138,7 +149,8 @@ class ConnectManager:
         except CalledProcessError as e:
             if "File exists" in e.stderr:
                 return
-            raise e
+        except Exception as e:
+            raise PluginDownloadFailedError(e)
 
     def remove_plugin(self, path_prefix: str) -> None:
         """Removes plugins for which the plugin-path starts with `path_prefix`."""
