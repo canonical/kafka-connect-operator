@@ -19,6 +19,7 @@ from ops.charm import (
 from ops.framework import Object
 
 from literals import CLIENT_REL
+from managers.connect import PluginDownloadFailedError
 
 if TYPE_CHECKING:
     from charm import ConnectCharm
@@ -62,9 +63,13 @@ class ConnectProvider(Object):
             event.defer()
             return
 
-        self.charm.connect_manager.load_plugin_from_url(
-            client.plugin_url, path_prefix=client.username
-        )
+        try:
+            self.charm.connect_manager.load_plugin_from_url(
+                client.plugin_url, path_prefix=client.username
+            )
+        except PluginDownloadFailedError as e:
+            logger.error(f"Unable to fetch the plugin: {e}")
+            return
 
         if not self.charm.unit.is_leader():
             return
