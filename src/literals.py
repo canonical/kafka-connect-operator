@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
 
-from ops.model import ActiveStatus, BlockedStatus, StatusBase, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase, WaitingStatus
 
 CHARM_KEY = "kafka-connect"
 SNAP_NAME = "charmed-kafka"
@@ -44,6 +44,7 @@ REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
 # Relations
 KAFKA_CLIENT_REL = "kafka-client"
 PEER_REL = "worker"
+CLIENT_REL = "connect-client"
 
 # TODO: this should be set using `profile` config option in the future
 LOG_SENSITIVE_OUTPUT = True  # set False for production mode & builds
@@ -68,7 +69,7 @@ class Status(Enum):
     """Collection of possible statuses for the charm."""
 
     SNAP_NOT_INSTALLED = StatusLevel(BlockedStatus(f"unable to install {SNAP_NAME} snap"), "ERROR")
-    INSTALLING = StatusLevel(WaitingStatus(f"Installing {SNAP_NAME}"), "DEBUG")
+    INSTALLING = StatusLevel(MaintenanceStatus(f"Installing {SNAP_NAME}"), "DEBUG")
     MISSING_KAFKA = StatusLevel(BlockedStatus("Application needs Kafka client relation"), "DEBUG")
     NO_KAFKA_CREDENTIALS = StatusLevel(
         WaitingStatus("Waiting for Kafka cluster credentials"), "DEBUG"

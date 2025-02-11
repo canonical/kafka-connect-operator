@@ -3632,6 +3632,7 @@ class KafkaConnectRequirerEventHandlers(RequirerEventHandlers):
 
     def __init__(self, charm: CharmBase, relation_data: KafkaConnectRequirerData) -> None:
         super().__init__(charm, relation_data)
+        # Just to keep lint quiet, can't resolve inheritance. The same happened in super().__init__() above
         self.relation_data = relation_data
 
     def _on_relation_created_event(self, event: RelationCreatedEvent) -> None:
