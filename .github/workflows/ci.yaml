@@ -50,6 +50,7 @@ jobs:
         path:
           - .
           - integrator/
+          - tests/integration/app-charm/
 
   integration-test:
     strategy:

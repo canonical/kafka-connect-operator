@@ -82,18 +82,6 @@ async def test_rest_endpoints_before_integration(ops_test: OpsTest):
 
     assert JDBC_SOURCE_CONNECTOR_CLASS not in connector_classes
 
-    # assert integrator is up
-    integrator_unit = ops_test.model.applications[INTEGRATOR_APP].units[0]
-    response = await make_api_request(
-        ops_test,
-        unit=integrator_unit,
-        auth_enabled=False,
-        endpoint="api/v1/healthcheck/liveness",
-        port=INTEGRATOR_PORT,
-    )
-
-    assert response.status_code == 200
-
 
 @pytest.mark.abort_on_fail
 async def test_integrate(ops_test: OpsTest, request: pytest.FixtureRequest):

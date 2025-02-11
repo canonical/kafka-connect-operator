@@ -18,6 +18,6 @@ async def kafka_connect_charm(ops_test: OpsTest):
 @pytest.fixture(scope="module")
 async def integrator_charm(ops_test: OpsTest):
     """Build the integrator charm."""
-    charm_path = "./integrator/"
+    charm_path = "./tests/integration/app-charm/"
     charm = await ops_test.build_charm(charm_path)
     return charm
