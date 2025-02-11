@@ -192,14 +192,6 @@ class ConnectClientContext(RelationContext):
         return self.relation_data.get("plugin-url", "")
 
     @property
-    def username(self) -> str:
-        """Returns the Kafka client username."""
-        if not self.relation:
-            return ""
-
-        return f"relation-{self.relation.id}"
-
-    @property
     def endpoints(self) -> str:
         """Returns Kafka Connect endpoints set for the client."""
         if not self.relation:
@@ -208,8 +200,16 @@ class ConnectClientContext(RelationContext):
         return self.relation_data.get("endpoints", "")
 
     @property
+    def username(self) -> str:
+        """Returns the Kafka Connect client username."""
+        if not self.relation:
+            return ""
+
+        return f"relation-{self.relation.id}"
+
+    @property
     def password(self) -> str:
-        """Returns the Kafka client password."""
+        """Returns the Kafka Connect client password."""
         if not self.relation:
             return ""
 
