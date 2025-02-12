@@ -21,6 +21,16 @@ requires:
     interface: connect_client
     optional: true
     limit: 1
+  # client interfaces 
+  mysql:
+    interface: mysql_client
+    optional: true
+    limit: 1
+  postgres:
+    interface: postgresql_client
+    optional: true
+    limit: 1
+
 
 resources:
   connect-plugin:
