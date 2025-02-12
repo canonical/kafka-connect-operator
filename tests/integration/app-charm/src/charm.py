@@ -9,10 +9,11 @@ import os
 import subprocess
 from typing import Optional
 
-from charms.data_platform_libs.v0.data_interfaces import DataPeerUnitData, KafkaConnectRequires
-from ops.charm import CharmBase, UpdateStatusEvent
+from charms.data_platform_libs.v0.data_interfaces import DataPeerUnitData
+from integrator import Integrator
+from ops.charm import CharmBase, CollectStatusEvent, UpdateStatusEvent
 from ops.main import main
-from ops.model import ActiveStatus, ModelError, Relation
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, ModelError, Relation
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ PORT = 8080
 CHARM_KEY = "integrator"
 CHARM_DIR = os.environ.get("CHARM_DIR", "")
 RESOURCE_PATH = f"{CHARM_DIR}/src/resources/"
+SERVER_LOGS = "/var/log/plugin-server.log"
 PLUGIN_RESOURCE_KEY = "connect-plugin"
 
 SOURCE_REL = "source"
@@ -33,11 +35,15 @@ def start_plugin_server(port: int = PORT):
 
     WARNING: this is in no way meant to be used in production code.
     """
-    current_dir = os.getcwd()
-    os.chdir(RESOURCE_PATH)
-    cmd = f"nohup python3 -m http.server {port} &"
-    os.system(cmd)
-    os.chdir(current_dir)
+    cmd = f"nohup python3 -m http.server {port}"
+    process = subprocess.Popen(
+        cmd.split(),
+        stdout=open("/dev/null", "w"),
+        stderr=open(SERVER_LOGS, "a+"),
+        preexec_fn=os.setpgrp,
+        cwd=RESOURCE_PATH,
+    )
+    logger.info(process.pid)
 
 
 class TestIntegratorCharm(CharmBase):
@@ -50,12 +56,16 @@ class TestIntegratorCharm(CharmBase):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.update_status, self._update_status)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
+        self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
         if not self.server_started:
             return
 
-        self.source_requirer = KafkaConnectRequires(self, SOURCE_REL, self.plugin_url)
-        self.sink_requirer = KafkaConnectRequires(self, SINK_REL, self.plugin_url)
+        # In its simplest form, this would be a no-op integrator on `source` interface.
+        # During test time, we could dynamically change the integrator module with other implementations.
+        # This would be achieved by replacing the `integrator` module with our desired implementation from `implementations` folder.
+        self.integrator = Integrator(self, self.plugin_url)
 
     @property
     def peer_relation(self) -> Optional[Relation]:
@@ -84,7 +94,9 @@ class TestIntegratorCharm(CharmBase):
             return False
 
         return bool(
-            self.peer_unit_interface.fetch_my_relation_field(self.peer_relation.id, "started")
+            self.peer_unit_interface.fetch_my_relation_field(
+                self.peer_relation.id, "server_started"
+            )
         )
 
     @server_started.setter
@@ -94,11 +106,11 @@ class TestIntegratorCharm(CharmBase):
 
         if val:
             self.peer_unit_interface.update_relation_data(
-                self.peer_relation.id, data={"started": "true"}
+                self.peer_relation.id, data={"server_started": "true"}
             )
         else:
             self.peer_unit_interface.delete_relation_data(
-                self.peer_relation.id, fields=["started"]
+                self.peer_relation.id, fields=["server_started"]
             )
 
     def _on_start(self, _) -> None:
@@ -108,16 +120,12 @@ class TestIntegratorCharm(CharmBase):
 
         start_plugin_server(PORT)
         self.server_started = True
-        self.unit.status = ActiveStatus()
         logger.info(f"Plugin server started @ {self.plugin_url}")
 
     def _update_status(self, event: UpdateStatusEvent) -> None:
         """Handler for `update-status` event."""
         if not self.server_started:
             self.on.start.emit()
-            return
-
-        self.unit.status = ActiveStatus()
 
     def _on_config_changed(self, _) -> None:
         """Handler for `config-changed` event."""
@@ -131,6 +139,25 @@ class TestIntegratorCharm(CharmBase):
         except (NameError, ModelError) as e:
             logger.error(f"Resource {PLUGIN_RESOURCE_KEY} not found or could not be downloaded.")
             raise e
+
+    def _on_collect_status(self, event: CollectStatusEvent):
+        """Handler for `collect-status` event."""
+        if not self.server_started or not getattr(self, "integrator", None):
+            event.add_status(MaintenanceStatus("Setting up the integrator..."))
+            return
+
+        if not self.integrator.ready:
+            event.add_status(
+                BlockedStatus(
+                    "Integrator not ready to start, check if all relations are setup successfully."
+                )
+            )
+            return
+
+        if self.integrator.started:
+            event.add_status(ActiveStatus("Started..."))
+        else:
+            event.add_status(ActiveStatus("Ready!"))
 
 
 if __name__ == "__main__":
