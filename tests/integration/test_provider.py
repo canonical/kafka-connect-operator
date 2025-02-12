@@ -64,7 +64,8 @@ async def test_deploy_app_and_integrator(ops_test: OpsTest, kafka_connect_charm,
         )
 
     assert ops_test.model.applications[APP_NAME].status == "active"
-    assert ops_test.model.applications[INTEGRATOR_APP].status == "active"
+    # dummy integrator boots up with blocked status, because BaseIntegrator.ready returns False.
+    assert ops_test.model.applications[INTEGRATOR_APP].status == "blocked"
 
 
 @pytest.mark.abort_on_fail
