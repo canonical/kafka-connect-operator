@@ -130,6 +130,7 @@ async def test_relate_with_connect_starts_source_integrator(ops_test: OpsTest, m
     """Checks source integrator task starts after relation with Kafka Connect."""
     # Hopefully, mysql_test_data fixture has filled our db with some test data.
     # Now it's time relate to Kafka Connect to start the task.
+    logger.info("Loaded 20 records into source MySQL DB.")
     await ops_test.model.add_relation(f"{MYSQL_INTEGRATOR}:source", APP_NAME)
 
     async with ops_test.fast_forward(fast_interval="60s"):
@@ -234,5 +235,6 @@ async def test_relate_with_connect_starts_sink_integrator(ops_test: OpsTest):
         f"psql postgresql://operator:{root_pass}@{postgres_host}:5432/{POSTGRES_DB} -c 'SELECT COUNT(*) FROM \"test_table_1\"'",
     )
 
+    logger.info("Checking number of records in sink Postgres DB (should be 20):")
     print(res.stdout)
     assert "20" in res.stdout
