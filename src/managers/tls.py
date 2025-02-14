@@ -15,7 +15,7 @@ from ops.pebble import ExecError
 
 from core.models import Context, TLSContext, WorkerUnitContext
 from core.workload import WorkloadBase
-from literals import CONFIG_DIR, GROUP, KEYSTORE_PATH, SNAP_NAME, TRUSTSTORE_PATH, USER, Substrates
+from literals import GROUP, SNAP_NAME, USER, Substrates
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class TLSManager:
 
         self.workload.write(
             content=self.tls_context.private_key,
-            path=f"{CONFIG_DIR}/server.key",
+            path=f"{self.workload.paths.config_dir}/server.key",
         )
 
     def set_ca(self) -> None:
@@ -68,7 +68,9 @@ class TLSManager:
             logger.error("Can't set CA to unit, missing CA in relation data")
             return
 
-        self.workload.write(content=self.tls_context.ca, path=f"{CONFIG_DIR}/ca.pem")
+        self.workload.write(
+            content=self.tls_context.ca, path=f"{self.workload.paths.config_dir}/ca.pem"
+        )
 
     def set_certificate(self) -> None:
         """Sets the unit certificate."""
@@ -78,7 +80,20 @@ class TLSManager:
 
         self.workload.write(
             content=self.tls_context.certificate,
-            path=f"{CONFIG_DIR}/server.pem",
+            path=f"{self.workload.paths.config_dir}/server.pem",
+        )
+
+    def set_bundle(self) -> None:
+        """Sets the unit cert bundle."""
+        if not self.tls_context.certificate or not self.tls_context.ca:
+            logger.error(
+                "Can't set cert bundle to unit, missing certificate or CA in relation data"
+            )
+            return
+
+        self.workload.write(
+            content="\n".join(self.tls_context.bundle),
+            path=f"{self.workload.paths.config_dir}/bundle.pem",
         )
 
     def set_chain(self) -> None:
@@ -88,25 +103,28 @@ class TLSManager:
             return
 
         for i, chain_cert in enumerate(self.tls_context.chain):
-            self.workload.write(content=chain_cert, path=f"{CONFIG_DIR}/chain{i}.pem")
+            self.workload.write(
+                content=chain_cert, path=f"{self.workload.paths.config_dir}/bundle{i}.pem"
+            )
 
     def set_truststore(self) -> None:
         """Adds CA to JKS truststore."""
-        trust_aliases = [f"chain{i}" for i in range(len(self.tls_context.chain))] + ["ca"]
+        trust_aliases = [f"bundle{i}" for i in range(len(self.tls_context.bundle))] + ["ca"]
 
         for alias in trust_aliases:
             self.import_cert(alias, f"{alias}.pem")
 
-        self.workload.exec(f"chown {USER}:{GROUP} {TRUSTSTORE_PATH}".split())
-        self.workload.exec(["chmod", "770", TRUSTSTORE_PATH])
+        self.workload.exec(f"chown {USER}:{GROUP} {self.workload.paths.truststore}".split())
+        self.workload.exec(["chmod", "770", self.workload.paths.truststore])
 
     def set_keystore(self) -> None:
         """Creates and adds unit cert and private-key to the keystore."""
-        command = f"openssl pkcs12 -export -in server.pem -inkey server.key -passin pass:{self.tls_context.keystore_password} -certfile server.pem -out {KEYSTORE_PATH} -password pass:{self.tls_context.keystore_password}"
+        in_file = "bundle.pem" if self.tls_context.bundle else "server.pem"
+        command = f"openssl pkcs12 -export -in {in_file} -inkey server.key -passin pass:{self.tls_context.keystore_password} -certfile server.pem -out {self.workload.paths.keystore} -password pass:{self.tls_context.keystore_password}"
         try:
-            self.workload.exec(command=command.split(), working_dir=CONFIG_DIR)
-            self.workload.exec(f"chown {USER}:{GROUP} {KEYSTORE_PATH}".split())
-            self.workload.exec(["chmod", "770", KEYSTORE_PATH])
+            self.workload.exec(command=command.split(), working_dir=self.workload.paths.config_dir)
+            self.workload.exec(f"chown {USER}:{GROUP} {self.workload.paths.keystore}".split())
+            self.workload.exec(["chmod", "770", self.workload.paths.keystore])
         except (subprocess.CalledProcessError, ExecError) as e:
             logger.error(e.stdout)
             raise e
@@ -114,11 +132,13 @@ class TLSManager:
     def import_cert(self, alias: str, filename: str, cert_content: str | None = None) -> None:
         """Add a certificate to the truststore."""
         if cert_content:
-            self.workload.write(content=cert_content, path=f"{CONFIG_DIR}/{filename}.pem")
+            self.workload.write(
+                content=cert_content, path=f"{self.workload.paths.config_dir}/{filename}.pem"
+            )
 
-        command = f"{self.keytool} -import -v -alias {alias} -file {filename} -keystore {TRUSTSTORE_PATH} -storepass {self.tls_context.truststore_password} -noprompt"
+        command = f"{self.keytool} -import -v -alias {alias} -file {filename} -keystore {self.workload.paths.truststore} -storepass {self.tls_context.truststore_password} -noprompt"
         try:
-            self.workload.exec(command=command.split(), working_dir=CONFIG_DIR)
+            self.workload.exec(command=command.split(), working_dir=self.workload.paths.config_dir)
         except (subprocess.CalledProcessError, ExecError) as e:
             # in case this reruns and fails
             if e.stdout and "already exists" in e.stdout:
@@ -130,9 +150,11 @@ class TLSManager:
     def remove_cert(self, alias: str) -> None:
         """Remove a cert from the truststore."""
         try:
-            command = f"{self.keytool} -delete -v -alias {alias} -keystore {KEYSTORE_PATH} -storepass {self.tls_context.truststore_password} -noprompt"
-            self.workload.exec(command=command.split(), working_dir=CONFIG_DIR)
-            self.workload.exec(f"rm -f {alias}.pem".split(), working_dir=CONFIG_DIR)
+            command = f"{self.keytool} -delete -v -alias {alias} -keystore {self.workload.paths.truststore} -storepass {self.tls_context.truststore_password} -noprompt"
+            self.workload.exec(command=command.split(), working_dir=self.workload.paths.config_dir)
+            self.workload.exec(
+                f"rm -f {alias}.pem".split(), working_dir=self.workload.paths.config_dir
+            )
         except (subprocess.CalledProcessError, ExecError) as e:
             if e.stdout and "does not exist" in e.stdout:
                 logger.warning(e.stdout)
@@ -160,7 +182,9 @@ class TLSManager:
         command = ["openssl", "x509", "-noout", "-ext", "subjectAltName", "-in", "server.pem"]
 
         try:
-            sans_lines = self.workload.exec(command=command, working_dir=CONFIG_DIR).splitlines()
+            sans_lines = self.workload.exec(
+                command=command, working_dir=self.workload.paths.config_dir
+            ).splitlines()
         except (subprocess.CalledProcessError, ExecError) as e:
             logger.error(e.stdout)
             raise e
@@ -212,5 +236,5 @@ class TLSManager:
     def remove_stores(self) -> None:
         """Cleans up all keys/certs/stores on a unit."""
         for pattern in ["*.pem", "*.key", "*.p12", "*.jks"]:
-            for file in glob.glob(f"{CONFIG_DIR}/{pattern}"):
+            for file in glob.glob(f"{self.workload.paths.config_dir}/{pattern}"):
                 self.workload.remove(file)

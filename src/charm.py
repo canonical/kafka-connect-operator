@@ -90,7 +90,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
 
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handler for `collect-status` event."""
-        workload_status = Status.INSTALLING if not self.workload.active() else self.context.status
+        workload_status = Status.INSTALLING if not self.workload.installed else self.context.status
         for status in self.pending_inactive_statuses + [workload_status]:
             event.add_status(status.value.status)
 

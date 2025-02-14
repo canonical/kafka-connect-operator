@@ -277,6 +277,19 @@ class TLSContext(RelationContext):
         return list(clean_chain)
 
     @property
+    def bundle(self) -> list[str]:
+        """The cert bundle used for TLS identity."""
+        if not all([self.certificate, self.ca, self.chain]):
+            return []
+
+        # manual-tls-certificates is loaded with the signed cert, the intermediate CA that signed it
+        # and then the missing chain for that CA
+        # We need to present the full bundle - aka Keystore
+        # we need to trust each item in the bundle - aka Truststore
+        bundle = [self.certificate, self.ca] + self.chain
+        return sorted(set(bundle), key=bundle.index)  # ordering might matter
+
+    @property
     def keystore_password(self) -> str:
         """The keystore password."""
         return self.relation_data.get(self.KEYSTORE_PASSWORD, "")

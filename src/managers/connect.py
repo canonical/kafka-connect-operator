@@ -132,6 +132,7 @@ class ConnectManager:
         self._untar_plugin(resource_path, load_path)
         self.workload.rmdir(f"{resource_path}")
         self.reload_plugins()
+        self.context.worker_unit.should_restart = True
 
     @retry(
         wait=wait_fixed(2),

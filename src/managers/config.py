@@ -15,7 +15,6 @@ from literals import (
     DEFAULT_AUTH_CLASS,
     DEFAULT_CONVERTER_CLASS,
     GROUP_ID,
-    PLUGIN_PATH,
     REPLICATION_FACTOR,
     TOPICS,
     ClientModes,
@@ -155,7 +154,7 @@ class ConfigManager:
     def rest_auth_properties(self) -> list[str]:
         """Returns authentication config properties on the REST API endpoint."""
         return [f"rest.extension.classes={DEFAULT_AUTH_CLASS}"]
-    
+
     @property
     def client_tls_properties(self) -> list[str]:
         """Returns the TLS properties for client if TLS is enabled."""

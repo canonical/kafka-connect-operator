@@ -113,6 +113,7 @@ class TLSHandler(Object):
         self.charm.tls_manager.set_ca()
         self.charm.tls_manager.set_certificate()
         self.charm.tls_manager.set_chain()
+        self.charm.tls_manager.set_bundle()
         self.charm.tls_manager.set_truststore()
         self.charm.tls_manager.set_keystore()
 

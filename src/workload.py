@@ -169,6 +169,15 @@ class Workload(WorkloadBase):
 
     @property
     @override
+    def installed(self) -> bool:
+        """Whether the workload service is installed or not."""
+        try:
+            return bool(self.kafka.services[self.service])
+        except (KeyError, snap.SnapNotFoundError):
+            return False
+
+    @property
+    @override
     def container_can_connect(self) -> bool:
         return True  # Always True on VM
 
