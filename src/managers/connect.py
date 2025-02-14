@@ -4,9 +4,13 @@
 
 """Manager for handling operations on Kafka Connect workers."""
 
+import glob
 import logging
 import os
+import re
+import tempfile
 from pathlib import Path
+from subprocess import CalledProcessError
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -14,6 +18,7 @@ from tenacity import (
     retry,
     retry_any,
     retry_if_exception,
+    retry_if_exception_type,
     retry_if_result,
     stop_after_attempt,
     wait_fixed,
@@ -24,6 +29,10 @@ from core.workload import WorkloadBase
 from literals import GROUP, USER
 
 logger = logging.getLogger(__name__)
+
+
+class PluginDownloadFailedError(Exception):
+    """Exception raised when plugin download fails."""
 
 
 class ConnectManager:
@@ -50,15 +59,29 @@ class ConnectManager:
         """Checks whether plugin path is initiated or not."""
         return os.path.exists(self.workload.paths.plugins)
 
+    @property
+    def loaded_client_plugins(self) -> set:
+        """Returns a set of client usernames for which the client plugin is loaded on this worker."""
+        self.reload_plugins()
+        cache: set = set()
+        for plugin in self.plugins_cache:
+            if match := re.search(r"relation-[0-9]+", plugin):
+                cache.add(match.group())
+        return cache
+
     def _plugin_checksum(self, plugin_path: Path) -> str:
         """Calculates checksum of a plugin, currently uses SHA-256 algorithm."""
         # Python 3.11+ has hashlib.file_digest(...) method but we use linux utils here for compatibility and better performance.
         raw = self.workload.exec(["sha256sum", str(plugin_path)]).split()
         return raw[0]
 
-    def _create_plugin_dir(self, plugin_path: Path) -> Path:
+    def _create_plugin_dir(self, plugin_path: Path, path_prefix: str = "") -> Path:
         """Creates a unique dir under `PLUGIN_PATH` to better organize lib JAR files."""
-        path = Path(self.workload.paths.plugins) / self._plugin_checksum(plugin_path)
+        path_prefix_ = f"{path_prefix}-" if path_prefix else ""
+        path = (
+            Path(self.workload.paths.plugins)
+            / f"{path_prefix_}{self._plugin_checksum(plugin_path)}"
+        )
         self.workload.mkdir(f"{path}")
         self.workload.exec(["chown", "-R", f"{USER}:{GROUP}", f"{path}"])
         return path
@@ -74,6 +97,13 @@ class ConnectManager:
                 opts = "xvf"
 
         self.workload.exec(["tar", f"-{opts}", str(src_path), "-C", str(dst_path)])
+
+    def _download_plugin(self, url: str, dst_path: str):
+        """Downloads plugin from a given URL and returns the file object."""
+        response = requests.get(url, stream=True)
+        with open(dst_path, mode="wb") as file:
+            for chunk in response.iter_content(chunk_size=10 * 1024):
+                file.write(chunk)
 
     def init_plugin_path(self) -> None:
         """Initiates `PLUGIN_PATH` folder and sets correct ownership and permissions."""
@@ -92,16 +122,40 @@ class ConnectManager:
         except FileNotFoundError:  # possibly since plugins folder not created yet.
             return
 
-    def load_plugin(self, resource_path: Path) -> None:
+    def load_plugin(self, resource_path: Path, path_prefix: str = "") -> None:
         """Loads a plugin from a given `resource_path` to the `PLUGIN_PATH` folder, skips if previously loaded."""
         if self._plugin_checksum(resource_path) in self.plugins_cache:
             logger.debug(f"Plugin {resource_path.name} already loaded, skipping...")
             return
 
-        load_path = self._create_plugin_dir(resource_path)
+        load_path = self._create_plugin_dir(resource_path, path_prefix=path_prefix)
         self._untar_plugin(resource_path, load_path)
         self.workload.rmdir(f"{resource_path}")
         self.reload_plugins()
+
+    @retry(
+        wait=wait_fixed(2),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(PluginDownloadFailedError),
+        reraise=True,
+    )
+    def load_plugin_from_url(self, plugin_url: str, path_prefix: str = "") -> None:
+        """Loads a plugin from a given `plugin_url` to the `PLUGIN_PATH` folder, skips if previously loaded."""
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                path = Path(tmp_dir) / "plugin.tar"
+                self._download_plugin(plugin_url, f"{path}")
+                self.load_plugin(path, path_prefix=path_prefix)
+        except CalledProcessError as e:
+            if "File exists" in e.stderr:
+                return
+        except Exception as e:
+            raise PluginDownloadFailedError(e)
+
+    def remove_plugin(self, path_prefix: str) -> None:
+        """Removes plugins for which the plugin-path starts with `path_prefix`."""
+        for path in glob.glob(f"{self.workload.paths.plugins}/{path_prefix}*"):
+            self.workload.exec(["rm", "-rf", path])
 
     def ping_connect_api(self) -> requests.Response:
         """Makes a GET request to the unit's Connect API Endpoint and returns the response."""
@@ -134,4 +188,6 @@ class ConnectManager:
 
     def restart_worker(self) -> None:
         """Attempts to restart the connect worker."""
+        logger.info("Restarting worker service.")
+        self.context.worker_unit.should_restart = False
         self.workload.restart()

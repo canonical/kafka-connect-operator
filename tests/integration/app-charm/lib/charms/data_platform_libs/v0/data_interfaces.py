@@ -3662,7 +3662,9 @@ class KafkaConnectRequirerEventHandlers(RequirerEventHandlers):
             "username" in diff.added and "password" in diff.added
         ) or secret_field_user in diff.added:
             logger.info("integration created at %s", datetime.now())
-            getattr(self.on, "integration_created").emit(event.relation, app=event.app, unit=event.unit)
+            getattr(self.on, "integration_created").emit(
+                event.relation, app=event.app, unit=event.unit
+            )
             return
 
         # Emit an endpoints changed event if the provider added or
@@ -3672,7 +3674,7 @@ class KafkaConnectRequirerEventHandlers(RequirerEventHandlers):
             logger.info("endpoints changed on %s", datetime.now())
             getattr(self.on, "integration_endpoints_changed").emit(
                 event.relation, app=event.app, unit=event.unit
-            ) 
+            )
             return
 
 

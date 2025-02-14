@@ -46,6 +46,12 @@ def patched_exec():
 
 
 @pytest.fixture(autouse=True)
+def active_workload():
+    with patch("workload.Workload.active") as active_workload:
+        yield active_workload
+
+
+@pytest.fixture(autouse=True)
 def patched_snap(monkeypatch):
     cache = Mock()
     snap_mock = Mock()
