@@ -91,7 +91,7 @@ class ConnectHandler(Object):
         current_config = set(self.charm.workload.read(self.workload.paths.worker_properties))
         diff = set(self.charm.config_manager.properties) ^ current_config
 
-        if not diff and not resource_path and not self.context.worker_unit.should_restart:
+        if not any([diff, resource_path, self.context.worker_unit.should_restart]):
             return
 
         if not self.context.ready:
