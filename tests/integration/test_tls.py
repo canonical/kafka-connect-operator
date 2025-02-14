@@ -108,7 +108,7 @@ async def test_tls_broken(ops_test: OpsTest):
 
         assert response.status_code == 200
 
-        # assert proper cleanup of all TLS artifacts.
-        for pattern in ["*.pem", "*.key", "*.p12", "*.jks"]:
-            res = await run_command_on_unit(ops_test, unit, f"sudo ls -l {CONFIG_DIR}/{pattern}")
-            assert "No such file or directory" in res.stdout
+        res = await run_command_on_unit(ops_test, unit, f"sudo ls {CONFIG_DIR}")
+        file_extensions = {f.split(".")[-1] for f in res.stdout.split() if f}
+
+        assert not {"pem", "key", "p12", "jks"} & file_extensions
