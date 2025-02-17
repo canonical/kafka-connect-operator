@@ -47,7 +47,7 @@ def patched_exec():
 
 @pytest.fixture(autouse=True)
 def active_workload():
-    with patch("workload.Workload.active") as active_workload:
+    with patch("workload.Workload.installed") as active_workload:
         yield active_workload
 
 

@@ -55,6 +55,20 @@ class KafkaHandler(Object):
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handler for `kafka-client-relation-changed` event."""
+        if self.context.kafka_client.tls_enabled and self.context.kafka_client.broker_ca:
+            # Import broker CA to truststore if not done.
+            tls_context = self.context.worker_unit.tls
+            if not tls_context.truststore_password:
+                self.charm.context.worker_unit.update(
+                    {tls_context.TRUSTSTORE_PASSWORD: self.charm.workload.generate_password()}
+                )
+
+            self.charm.tls_manager.import_cert(
+                tls_context.BROKER_CA,
+                f"{tls_context.BROKER_CA}.pem",
+                cert_content=self.context.kafka_client.broker_ca,
+            )
+
         self.charm.on.config_changed.emit()
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:

@@ -156,6 +156,17 @@ class ConfigManager:
         return [f"rest.extension.classes={DEFAULT_AUTH_CLASS}"]
 
     @property
+    def client_tls_properties(self) -> list[str]:
+        """Returns the TLS properties for client if TLS is enabled."""
+        if not self.context.kafka_client.tls_enabled:
+            return []
+
+        return [
+            f"ssl.truststore.location={self.workload.paths.truststore}",
+            f"ssl.truststore.password={self.context.worker_unit.tls.truststore_password}",
+        ]
+
+    @property
     def rest_listener_properties(self) -> list[str]:
         """Returns Listener properties for the REST API endpoint."""
         return [
@@ -163,6 +174,21 @@ class ConfigManager:
             f"rest.advertised.listener={self.context.rest_protocol}",
             f"rest.advertised.host.name={self.context.worker_unit.internal_address}",
             f"rest.advertised.host.port={self.context.rest_port}",
+        ]
+
+    @property
+    def rest_tls_properties(self) -> list[str]:
+        """Returns TLS properties for the REST API endpoint."""
+        if not self.context.peer_workers.tls_enabled:
+            return []
+
+        return [
+            "listeners.https.ssl.client.authentication=requested",
+            f"listeners.https.ssl.truststore.location={self.workload.paths.truststore}",
+            f"listeners.https.ssl.truststore.password={self.context.worker_unit.tls.truststore_password}",
+            f"listeners.https.ssl.keystore.location={self.workload.paths.keystore}",
+            f"listeners.https.ssl.keystore.password={self.context.worker_unit.tls.keystore_password}",
+            "listeners.https.ssl.endpoint.identification.algorithm=HTTPS",
         ]
 
     @property
@@ -175,9 +201,11 @@ class ConfigManager:
                 f"plugin.path={self.workload.paths.plugins}",
             ]
             + DEFAULT_CONFIG_OPTIONS.split("\n")
-            + self.rest_auth_properties
             + self.rest_listener_properties
+            + self.rest_tls_properties
+            + self.rest_auth_properties
             + self.client_auth_properties
+            + self.client_tls_properties
             + self.converter_properties
             + self.topic_properties
         )

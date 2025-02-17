@@ -4,6 +4,7 @@
 
 """Event Handler for Kafka Connect related events."""
 
+import datetime
 import logging
 from typing import TYPE_CHECKING
 
@@ -32,6 +33,7 @@ class ConnectHandler(Object):
         self.charm: "ConnectCharm" = charm
         self.context = charm.context
         self.workload = charm.workload
+        self.unit_tls_context = self.context.worker_unit.tls
 
         self.framework.observe(getattr(self.charm.on, "update_status"), self._update_status)
         self.framework.observe(getattr(self.charm.on, "config_changed"), self._on_config_changed)
@@ -39,8 +41,9 @@ class ConnectHandler(Object):
 
         # instantiate the provider
         self.provider = ConnectProvider(self.charm)
+        self.framework.observe(self.charm.on[PEER_REL].relation_changed, self._on_config_changed)
 
-    def _update_status(self, event: EventBase):
+    def _update_status(self, event: EventBase) -> None:
         """Handler for `update-status` event."""
         if self.charm.connect_manager.health_check():
             self.charm._set_status(Status.ACTIVE)
@@ -55,7 +58,7 @@ class ConnectHandler(Object):
         # for plugins update if needed
         self.charm.on.config_changed.emit()
 
-    def _on_config_changed(self, event: ConfigChangedEvent):
+    def _on_config_changed(self, event: ConfigChangedEvent) -> None:
         """Handler for `config-changed` event."""
         if not self.charm.connect_manager.plugin_path_initiated:
             self.charm.connect_manager.init_plugin_path()
@@ -73,6 +76,17 @@ class ConnectHandler(Object):
 
         self.update_plugins()
         self.update_clients_data()
+
+        if self.context.peer_workers.tls_enabled and self.charm.tls_manager.sans_change_detected:
+            self.charm.tls.certificates.on.certificate_expiring.emit(
+                certificate=self.unit_tls_context.certificate,
+                expiry=datetime.datetime.now().isoformat(),
+            )
+            self.charm.context.worker_unit.update(
+                {self.unit_tls_context.CERT: ""}
+            )  # ensures only single requested new certs, will be replaced on new certificate-available event
+
+            return  # config-changed would be eventually fired on certificate-available, so no need to defer.
 
         current_config = set(self.charm.workload.read(self.workload.paths.worker_properties))
         diff = set(self.charm.config_manager.properties) ^ current_config
@@ -128,8 +142,10 @@ class ConnectHandler(Object):
                     "endpoints": self.context.rest_endpoints,
                     "username": client.username,
                     "password": client.password,
-                    # "tls": self.context.peer_workers.tls_enabled,
-                    # "tls-ca": self.context.worker_unit.tls.ca
+                    "tls": "enabled" if self.context.peer_workers.tls_enabled else "disabled",
+                    "tls-ca": self.context.worker_unit.tls.ca
+                    if self.context.peer_workers.tls_enabled
+                    else "disabled",
                 }
             )
 

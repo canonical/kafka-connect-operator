@@ -149,6 +149,10 @@ class Workload(WorkloadBase):
         self.exec(["rm", "-r", path])
 
     @override
+    def remove(self, path: str):
+        self.exec(["rm", path])
+
+    @override
     def check_socket(self, host: str, port: int) -> bool:
         """Checks whether an IPv4 socket is healthy or not."""
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
@@ -162,6 +166,15 @@ class Workload(WorkloadBase):
         updated_env = current_env | self.map_env(env_vars)
         content = "\n".join([f"{key}={value}" for key, value in updated_env.items()])
         self.write(content=content + "\n", path=self.paths.env)
+
+    @property
+    @override
+    def installed(self) -> bool:
+        """Whether the workload service is installed or not."""
+        try:
+            return bool(self.kafka.services[self.service])
+        except (KeyError, snap.SnapNotFoundError):
+            return False
 
     @property
     @override

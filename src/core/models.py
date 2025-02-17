@@ -4,6 +4,7 @@
 
 """Collection of context objects for the Kafka Connect charm relations, apps and units."""
 
+import json
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -103,6 +104,19 @@ class RelationContext(WithStatus):
 
         return ""
 
+    @property
+    def tls_enabled(self) -> bool:
+        """Returns True if TLS is enabled on relation."""
+        if not self.relation:
+            return False
+
+        tls = self.relation_data.get("tls")
+
+        if tls is not None and tls != "disabled":
+            return True
+
+        return False
+
 
 class KafkaClientContext(RelationContext):
     """Context collection metadata for kafka-client relation."""
@@ -139,17 +153,12 @@ class KafkaClientContext(RelationContext):
         return self.relation_data.get("endpoints", "")
 
     @property
-    def tls_enabled(self) -> bool:
-        """Returns True if TLS is enabled on Kafka-Client relation."""
-        if not self.relation:
-            return False
+    def broker_ca(self) -> str:
+        """Returns the broker CA if the relation uses TLS, otherwise empty string."""
+        if not self.relation or not self.tls_enabled:
+            return ""
 
-        tls = self.relation_data.get("tls")
-
-        if tls is not None and tls != "disabled":
-            return True
-
-        return False
+        return self.relation_data.get("tls-ca", "")
 
     @property
     def security_protocol(self) -> str:
@@ -221,6 +230,81 @@ class ConnectClientContext(RelationContext):
         return Status.ACTIVE
 
 
+class TLSContext(RelationContext):
+    """TLS metadata of a relation."""
+
+    CA = "ca"
+    CHAIN = "chain"
+    CERT = "certificate"
+    CSR = "csr"
+    BROKER_CA = "broker"
+    PRIVATE_KEY = "private-key"
+    KEYSTORE_PASSWORD = "keystore-password"
+    TRUSTSTORE_PASSWORD = "truststore-password"
+    KEYS = {CA, CERT, CSR, CHAIN}
+    SECRETS = [CERT, CSR, PRIVATE_KEY, KEYSTORE_PASSWORD, TRUSTSTORE_PASSWORD]
+
+    def __init__(self, relation, data_interface, component, substrate=SUBSTRATE):
+        super().__init__(relation, data_interface, component, substrate)
+
+    @property
+    def private_key(self) -> str:
+        """Private key of the TLS relation."""
+        return self.relation_data.get(self.PRIVATE_KEY, "")
+
+    @property
+    def csr(self) -> str:
+        """Certificate Signing Request (CSR) of the TLS relation."""
+        return self.relation_data.get(self.CSR, "")
+
+    @property
+    def certificate(self) -> str:
+        """The signed certificate from the provider relation."""
+        return self.relation_data.get(self.CERT, "")
+
+    @property
+    def ca(self) -> str:
+        """The CA used to sign the certificate."""
+        return self.relation_data.get(self.CA, "")
+
+    @property
+    def chain(self) -> list[str]:
+        """The chain used to sign unit cert."""
+        full_chain = json.loads(self.relation_data.get(self.CHAIN, "null")) or []
+        # to avoid adding certificate to truststore if self-signed
+        clean_chain: set[str] = set(full_chain) - {self.certificate, self.ca}
+
+        return list(clean_chain)
+
+    @property
+    def bundle(self) -> list[str]:
+        """The cert bundle used for TLS identity."""
+        if not all([self.certificate, self.ca, self.chain]):
+            return []
+
+        # manual-tls-certificates is loaded with the signed cert, the intermediate CA that signed it
+        # and then the missing chain for that CA
+        # We need to present the full bundle - aka Keystore
+        # we need to trust each item in the bundle - aka Truststore
+        bundle = [self.certificate, self.ca] + self.chain
+        return sorted(set(bundle), key=bundle.index)  # ordering might matter
+
+    @property
+    def keystore_password(self) -> str:
+        """The keystore password."""
+        return self.relation_data.get(self.KEYSTORE_PASSWORD, "")
+
+    @property
+    def truststore_password(self) -> str:
+        """The truststore password."""
+        return self.relation_data.get(self.TRUSTSTORE_PASSWORD, "")
+
+    @property
+    @override
+    def status(self) -> Status:
+        return Status.ACTIVE
+
+
 class WorkerUnitContext(RelationContext):
     """Context collection metadata for a single Kafka Connect worker unit."""
 
@@ -238,6 +322,11 @@ class WorkerUnitContext(RelationContext):
     def unit_id(self) -> int:
         """The id of the unit from the unit name."""
         return int(self.unit.name.split("/")[1])
+
+    @property
+    def tls(self) -> TLSContext:
+        """TLS Context of the worker unit."""
+        return TLSContext(self.relation, self.data_interface, self.component)
 
     @property
     def internal_address(self) -> str:
@@ -312,14 +401,14 @@ class Context(WithStatus, Object):
         self.substrate = substrate
         self.config = charm.config
 
-        self.peer_app_interface = DataPeerData(self.model, relation_name=PEER_REL)
-        self.peer_unit_interface = DataPeerUnitData(self.model, relation_name=PEER_REL)
         self.peer_app_interface = DataPeerData(
             self.model,
             relation_name=PEER_REL,
             additional_secret_fields=[PeerWorkersContext.ADMIN_PASSWORD],
         )
-        self.peer_unit_interface = DataPeerUnitData(self.model, relation_name=PEER_REL)
+        self.peer_unit_interface = DataPeerUnitData(
+            self.model, relation_name=PEER_REL, additional_secret_fields=TLSContext.SECRETS
+        )
         self.kafka_client_interface = KafkaRequirerData(
             self.model,
             relation_name=KAFKA_CLIENT_REL,
@@ -384,12 +473,6 @@ class Context(WithStatus, Object):
         return set(self.model.relations[CLIENT_REL])
 
     @property
-    def tls_enabled(self) -> bool:
-        """Returns True if TLS is enabled."""
-        # TODO: fix after tls support is added
-        return False
-
-    @property
     def rest_port(self) -> int:
         """Returns the REST API port."""
         return self.config.rest_port
@@ -397,7 +480,7 @@ class Context(WithStatus, Object):
     @property
     def rest_protocol(self) -> str:
         """Returns the REST API protocol, either `http` or `https`."""
-        return "http" if not self.tls_enabled else "https"
+        return "http" if not self.peer_workers.tls_enabled else "https"
 
     @property
     def rest_uri(self) -> str:

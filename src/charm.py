@@ -17,6 +17,7 @@ from core.models import Context
 from core.structured_config import CharmConfig
 from events.connect import ConnectHandler
 from events.kafka import KafkaHandler
+from events.tls import TLSHandler
 from literals import (
     CHARM_KEY,
     SUBSTRATE,
@@ -27,6 +28,7 @@ from literals import (
 from managers.auth import AuthManager
 from managers.config import ConfigManager
 from managers.connect import ConnectManager
+from managers.tls import TLSManager
 from workload import Workload
 
 logger = logging.getLogger(__name__)
@@ -52,6 +54,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
             context=self.context, workload=self.workload, config=self.config
         )
         self.connect_manager = ConnectManager(context=self.context, workload=self.workload)
+        self.tls_manager = TLSManager(self.context, self.workload, substrate=SUBSTRATE)
 
         self.framework.observe(getattr(self.on, "install"), self._on_install)
         self.framework.observe(getattr(self.on, "start"), self._on_start)
@@ -61,6 +64,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
 
         self.connect = ConnectHandler(self)
         self.kafka = KafkaHandler(self)
+        self.tls = TLSHandler(self)
 
     def _on_install(self, _) -> None:
         """Handler for `install` event."""
@@ -86,7 +90,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
 
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handler for `collect-status` event."""
-        workload_status = Status.INSTALLING if not self.workload.active() else self.context.status
+        workload_status = Status.INSTALLING if not self.workload.installed else self.context.status
         for status in self.pending_inactive_statuses + [workload_status]:
             event.add_status(status.value.status)
 

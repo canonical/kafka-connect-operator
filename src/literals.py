@@ -45,6 +45,7 @@ REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
 KAFKA_CLIENT_REL = "kafka-client"
 PEER_REL = "worker"
 CLIENT_REL = "connect-client"
+TLS_REL = "certificates"
 
 # TODO: this should be set using `profile` config option in the future
 LOG_SENSITIVE_OUTPUT = True  # set False for production mode & builds
