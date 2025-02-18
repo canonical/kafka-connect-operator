@@ -24,7 +24,8 @@ peers:
 provides:
   connect-client:
     interface: connect_client
-    optional: true
+  cos-agent:
+    interface: cos_agent
 
 requires:
   kafka-client:

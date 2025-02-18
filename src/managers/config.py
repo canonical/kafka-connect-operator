@@ -15,6 +15,7 @@ from literals import (
     DEFAULT_AUTH_CLASS,
     DEFAULT_CONVERTER_CLASS,
     GROUP_ID,
+    JMX_EXPORTER_PORT,
     REPLICATION_FACTOR,
     TOPICS,
     ClientModes,
@@ -82,6 +83,15 @@ class ConfigManager:
 
         self.workload.write(content=self.jaas_config + "\n", path=self.workload.paths.jaas)
 
+    def save_jmx_prometheus_config(self) -> None:
+        """Saves JMX Prometheus config to the `jmx_prometheus_config` path."""
+        raw = self.workload.read(
+            f"{self.workload.paths.charm_dir}/src/cos_config/jmx_prometheus_config.yaml"
+        )
+        self.workload.write(
+            content="\n".join(raw) + "\n", path=self.workload.paths.jmx_prometheus_config
+        )
+
     def save_properties(self) -> None:
         """Writes all Kafka Connect config properties to the `connect-distributed.properties` path."""
         self.workload.write(
@@ -92,6 +102,7 @@ class ConfigManager:
         """Make all steps necessary to start the Connect service, including setting env vars, JAAS config and service config files."""
         self.workload.set_environment(env_vars=[self.kafka_opts])
         self.save_jaas_config()
+        self.save_jmx_prometheus_config()
         self.save_properties()
 
     @property
@@ -129,11 +140,16 @@ class ConfigManager:
         )
 
     @property
+    def jmx_opts(self) -> list[str]:
+        """The JMX options for configuring the prometheus exporter."""
+        return [
+            f"-javaagent:{self.workload.paths.jmx_prometheus_javaagent}={JMX_EXPORTER_PORT}:{self.workload.paths.jmx_prometheus_config}",
+        ]
+
+    @property
     def kafka_opts(self) -> str:
         """Returns all necessary options for KAFKA_OPTS env var."""
-        opts = [
-            f"-Djava.security.auth.login.config={self.workload.paths.jaas}",
-        ]
+        opts = [f"-Djava.security.auth.login.config={self.workload.paths.jaas}", *self.jmx_opts]
 
         return f"KAFKA_OPTS='{' '.join(opts)}'"
 

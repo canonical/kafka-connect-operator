@@ -8,6 +8,7 @@ import logging
 
 import ops
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops import (
     CollectStatusEvent,
     StatusBase,
@@ -20,6 +21,8 @@ from events.kafka import KafkaHandler
 from events.tls import TLSHandler
 from literals import (
     CHARM_KEY,
+    JMX_EXPORTER_PORT,
+    SNAP_NAME,
     SUBSTRATE,
     DebugLevel,
     Status,
@@ -56,15 +59,26 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.connect_manager = ConnectManager(context=self.context, workload=self.workload)
         self.tls_manager = TLSManager(self.context, self.workload, substrate=SUBSTRATE)
 
-        self.framework.observe(getattr(self.on, "install"), self._on_install)
-        self.framework.observe(getattr(self.on, "start"), self._on_start)
-        self.framework.observe(getattr(self.on, "remove"), self._on_remove)
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.start, self._on_start)
+        self.framework.observe(self.on.remove, self._on_remove)
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
         self.connect = ConnectHandler(self)
         self.kafka = KafkaHandler(self)
         self.tls = TLSHandler(self)
+
+        self.cos_agent = COSAgentProvider(
+            self,
+            metrics_endpoints=[
+                # Endpoint for the kafka and jmx exporters
+                # See https://github.com/canonical/charmed-kafka-snap for details
+                {"path": "/metrics", "port": JMX_EXPORTER_PORT},
+            ],
+            metrics_rules_dir="./src/alert_rules/prometheus",
+            log_slots=[f"{SNAP_NAME}:connect-logs"],
+        )
 
     def _on_install(self, _) -> None:
         """Handler for `install` event."""
