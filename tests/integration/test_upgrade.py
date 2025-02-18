@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.broker
 
-CHANNEL = "3/stable"
+CHANNEL = "edge/upgrade"
 
 
 @pytest.mark.abort_on_fail

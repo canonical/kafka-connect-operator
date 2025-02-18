@@ -61,6 +61,7 @@ jobs:
           - integration-tls
           - integration-plugins
           - integration-provider
+          - integration-upgrade
     name: ${{ matrix.tox-environments }}
     needs:
       - lint
