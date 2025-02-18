@@ -12,11 +12,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 from charms.data_platform_libs.v0.upgrade import ClusterNotReadyError, DependencyModel
-from ops.testing import Container, Context, PeerRelation, State
+from ops.testing import Context, PeerRelation, State
 
 from charm import ConnectCharm
 from events.upgrade import ConnectDependencyModel
-from literals import CONTAINER, DEPENDENCIES, PEER_REL, SUBSTRATE
+from literals import DEPENDENCIES, PEER_REL, SUBSTRATE
 
 logger = logging.getLogger(__name__)
 
@@ -32,24 +32,6 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 def charm_configuration():
     """Enable direct mutation on configuration dict."""
     return json.loads(json.dumps(CONFIG))
-
-
-@pytest.fixture()
-def base_state():
-
-    if SUBSTRATE == "k8s":
-        state = State(leader=True, containers=[Container(name=CONTAINER, can_connect=True)])
-
-    else:
-        state = State(leader=True)
-
-    return state
-
-
-@pytest.fixture()
-def ctx() -> Context:
-    ctx = Context(ConnectCharm, meta=METADATA, config=CONFIG, actions=ACTIONS, unit_id=0)
-    return ctx
 
 
 @pytest.fixture()
