@@ -40,7 +40,7 @@ class Integrator(BaseIntegrator):
     formatter = MySQLConfigFormatter
     mode = "source"
 
-    DB_CLIENT_REL = "mysql"
+    DB_CLIENT_REL = "source"
     DB_NAME = "test_db"
 
     def __init__(self, charm: CharmBase, plugin_url: str):

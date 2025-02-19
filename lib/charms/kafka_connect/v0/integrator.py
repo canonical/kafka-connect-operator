@@ -4,6 +4,9 @@
 
 """Requirer-side event handling and charm config management for Kafka Connect integrator charms."""
 
+# TODO: this would be moved into a separate python package alongside the REST interface implementation for plugin serving.
+# The instructions to use the package should be added to README there.
+
 import json
 import logging
 from abc import ABC, abstractmethod
@@ -25,7 +28,6 @@ from ops.charm import CharmBase, RelationBrokenEvent
 from ops.framework import Object
 from ops.model import ConfigData, Relation
 from requests.auth import HTTPBasicAuth
-
 
 # The unique Charmhub library identifier, never change it
 LIBID = "77777777777777777777777777777777"
@@ -55,9 +57,12 @@ IntegratorMode = Literal["source", "sink"]
 class TaskStatus(str, Enum):
     """Enum for Connector task status representation."""
 
-    STOPPED = "STOPPED"
+    UNASSIGNED = "UNASSIGNED"
+    PAUSED = "PAUSED"
     RUNNING = "RUNNING"
+    STOPPED = "STOPPED"
     FAILED = "FAILED"
+    UNKNOWN = "UNKNOWN"
 
 
 class ClientContext:
@@ -146,7 +151,7 @@ class BaseConfigFormatter:
         return ret
 
 
-class ConnectIntergation:
+class ConnectClient:
     """Client object used for interacting with Kafka Connect REST API."""
 
     def __init__(self, client_context: ClientContext, connector_name: str):
@@ -207,7 +212,7 @@ class ConnectIntergation:
 
     def start_task(self, task_config: dict) -> None:
         """Starts a connector task by posting `task_config` to the `connectors` endpoint.
-        
+
         Raises:
             ConnectApiError: If unsuccessful.
         """
@@ -220,13 +225,13 @@ class ConnectIntergation:
         if response.status_code == 409 and "already exists" in response.json().get("message", ""):
             logger.info("Task has already been submitted, skipping...")
             return
-        
+
         logger.error(response.content)
         raise ConnectApiError(f"Unable to start the task, details: {response.content}")
 
     def stop_task(self) -> None:
         """Stops a connector by making a request to connectors/CONNECTOR-NAME/stop endpoint.
-        
+
         Raises:
             ConnectApiError: If unsuccessful.
         """
@@ -234,6 +239,43 @@ class ConnectIntergation:
 
         if response.status_code != 204:
             raise ConnectApiError(f"Unable to stop the task, details: {response.content}")
+
+    def task_status(self) -> TaskStatus:
+        """Returns the connector/task status."""
+        response = self.request(
+            method="GET", api=f"connectors/{self.connector_name}/tasks", timeout=10
+        )
+
+        if response.status_code not in (200, 404):
+            logger.error(f"Unable to fetch tasks status, details: {response.content}")
+            return TaskStatus.UNKNOWN
+
+        if response.status_code == 404:
+            return TaskStatus.UNASSIGNED
+
+        tasks = response.json()
+
+        if not tasks:
+            return TaskStatus.UNASSIGNED
+
+        task_id = tasks[0].get("id", {}).get("task", 0)
+        status_response = self.request(
+            method="GET",
+            api=f"connectors/{self.connector_name}/tasks/{task_id}/status",
+            timeout=10,
+        )
+
+        if status_response.status_code == 404:
+            return TaskStatus.UNASSIGNED
+
+        if status_response.status_code != 200:
+            logger.error(
+                f"Unable to fetch tasks status, details: {status_response.content}"
+            )
+            return TaskStatus.UNKNOWN
+
+        state = status_response.json().get("state", "UNASSIGNED")
+        return TaskStatus(state)
 
 
 class _DataInterfacesHelpers:
@@ -285,8 +327,7 @@ class BaseIntegrator(ABC, Object):
     formatter: type[BaseConfigFormatter]
 
     CONFIG_SECRET_FIELD = "config"
-    SOURCE_REL = "source"
-    SINK_REL = "sink"
+    CONNECT_REL = "connect-client"
     PEER_REL = "peer"
 
     def __init__(
@@ -299,7 +340,9 @@ class BaseIntegrator(ABC, Object):
 
         for field in ("name", "mode", "formatter"):
             if not getattr(self, field, None):
-                raise AttributeError(f"{field} not defined on BaseIntegrator interface, did you forget to set the {field} class variable?")
+                raise AttributeError(
+                    f"{field} not defined on BaseIntegrator interface, did you forget to set the {field} class variable?"
+                )
 
         self.charm = charm
         self.plugin_url = plugin_url
@@ -307,16 +350,8 @@ class BaseIntegrator(ABC, Object):
         self.helpers: _DataInterfacesHelpers = _DataInterfacesHelpers(self.charm)
 
         # init handlers
-        if self.mode == "source":
-            self.rel_name = self.SOURCE_REL
-            self.requirer = KafkaConnectRequirerEventHandlers(
-                self.charm, self._source_requirer_interface
-            )
-        else:
-            self.rel_name = self.SINK_REL
-            self.requirer = KafkaConnectRequirerEventHandlers(
-                self.charm, self._sink_requirer_interface
-            )
+        self.rel_name = self.CONNECT_REL
+        self.requirer = KafkaConnectRequirerEventHandlers(self.charm, self._requirer_interface)
 
         # register basic listeners for common hooks
         self.framework.observe(self.requirer.on.integration_created, self._on_integration_created)
@@ -333,17 +368,10 @@ class BaseIntegrator(ABC, Object):
         return self.model.get_relation(self.PEER_REL)
 
     @cached_property
-    def _source_requirer_interface(self) -> KafkaConnectRequirerData:
-        """`source` requirer data interface."""
+    def _requirer_interface(self) -> KafkaConnectRequirerData:
+        """`connect-client` requirer data interface."""
         return KafkaConnectRequirerData(
-            self.model, relation_name=self.SOURCE_REL, plugin_url=self.plugin_url
-        )
-
-    @cached_property
-    def _sink_requirer_interface(self) -> KafkaConnectRequirerData:
-        """`sink` requirer data interface."""
-        return KafkaConnectRequirerData(
-            self.model, relation_name=self.SINK_REL, plugin_url=self.plugin_url
+            self.model, relation_name=self.CONNECT_REL, plugin_url=self.plugin_url
         )
 
     @cached_property
@@ -358,19 +386,14 @@ class BaseIntegrator(ABC, Object):
     @cached_property
     def _client_context(self) -> ClientContext:
         """Kafka Connect client data populated from relation data."""
-        if self.mode == "source":
-            return ClientContext(
-                self.charm.model.get_relation(self.SOURCE_REL), self._source_requirer_interface
-            )
-        else:
-            return ClientContext(
-                self.charm.model.get_relation(self.SINK_REL), self._sink_requirer_interface
-            )
+        return ClientContext(
+            self.charm.model.get_relation(self.CONNECT_REL), self._requirer_interface
+        )
 
     @cached_property
-    def _client(self) -> ConnectIntergation:
+    def _client(self) -> ConnectClient:
         """Kafka Connect client for handling REST API calls."""
-        return ConnectIntergation(self._client_context, self.name)
+        return ConnectClient(self._client_context, self.name)
 
     # Public properties
 
@@ -441,12 +464,11 @@ class BaseIntegrator(ABC, Object):
         except ConnectApiError as e:
             logger.error(f"Task start failed, details: {e}")
             return
-        
+
         self.started = True
 
     def stop_task(self) -> None:
         """Stops the connector task."""
-        
         try:
             self._client.stop_task()
         except ConnectApiError as e:
@@ -456,12 +478,13 @@ class BaseIntegrator(ABC, Object):
         self.teardown()
         self.started = False
 
+    @property
     def task_status(self) -> TaskStatus:
         """Returns connector task status."""
         if not self.started:
-            return TaskStatus.STOPPED
-        
-        return TaskStatus.RUNNING
+            return TaskStatus.UNASSIGNED
+
+        return self._client.task_status()
 
     # Abstract methods
 

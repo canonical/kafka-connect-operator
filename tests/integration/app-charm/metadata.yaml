@@ -13,20 +13,16 @@ peers:
     interface: peer
 
 requires:
-  source:
-    interface: connect_client
-    optional: true
-    limit: 1
-  sink:
+  connect-client:
     interface: connect_client
     optional: true
     limit: 1
   # client interfaces 
-  mysql:
+  source:
     interface: mysql_client
     optional: true
     limit: 1
-  postgres:
+  sink:
     interface: postgresql_client
     optional: true
     limit: 1

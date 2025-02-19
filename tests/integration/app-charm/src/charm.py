@@ -154,10 +154,7 @@ class TestIntegratorCharm(CharmBase):
             )
             return
 
-        if self.integrator.started:
-            event.add_status(ActiveStatus("Started..."))
-        else:
-            event.add_status(ActiveStatus("Ready!"))
+        event.add_status(ActiveStatus(self.integrator.task_status))
 
 
 if __name__ == "__main__":
