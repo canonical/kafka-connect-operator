@@ -66,5 +66,5 @@ def juju_microk8s():
         logger.info(command)
         ret_code = os.system(command)
 
-        if not ret_code:
+        if ret_code:
             raise OSError(f'command "{command}" failed with error code {ret_code}')
