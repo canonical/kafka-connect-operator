@@ -5,6 +5,7 @@
 
 import logging
 import os
+import subprocess
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -31,6 +32,13 @@ async def integrator_charm(ops_test: OpsTest):
 @pytest.fixture(scope="session")
 def juju_microk8s():
     user_env_var = os.environ.get("USER", "root")
+    os.system("sudo apt install -y jq")
+    ip_addr = subprocess.check_output(
+        "ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc'",
+        universal_newlines=True,
+        stderr=subprocess.PIPE,
+        shell=True,
+    ).strip()
 
     setup_commands = f"""
         # install microk8s
@@ -47,9 +55,7 @@ def juju_microk8s():
         # enable required addons
         sudo microk8s enable dns
         sudo microk8s enable hostpath-storage
-        sudo apt install jq
-        #IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
-        #microk8s enable metallb:$IPADDR-$IPADDR
+        sudo microk8s enable metallb:{ip_addr}-{ip_addr}
 
         # configure & bootstrap microk8s controller
         sudo mkdir -p /var/snap/juju/current/microk8s/credentials
@@ -57,6 +63,19 @@ def juju_microk8s():
         sudo chown -R {user_env_var}:{user_env_var} /var/snap/juju/current/microk8s/credentials
 
         juju bootstrap microk8s
+        sleep 90
+
+        # deploy COS
+        juju switch microk8s-localhost
+        juju add-model cos
+        juju switch cos
+
+        curl -L https://raw.githubusercontent.com/canonical/cos-lite-bundle/main/overlays/offers-overlay.yaml -O
+        curl -L https://raw.githubusercontent.com/canonical/cos-lite-bundle/main/overlays/storage-small-overlay.yaml -O
+
+        juju deploy cos-lite --trust --overlay ./offers-overlay.yaml --overlay ./storage-small-overlay.yaml
+        sleep 300
+        juju status --relations
     """
 
     for line in setup_commands.split("\n"):
