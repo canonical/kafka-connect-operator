@@ -30,29 +30,31 @@ async def integrator_charm(ops_test: OpsTest):
 
 @pytest.fixture(scope="session")
 def juju_microk8s():
-    setup_commands = """
+    user_env_var = os.environ.get("USER", "root")
+
+    setup_commands = f"""
         # install microk8s
         sudo snap install microk8s --classic --channel=1.32
 
         # configure microk8s
-        sudo usermod -a -G microk8s $USER
+        sudo usermod -a -G microk8s {user_env_var}
         mkdir -p ~/.kube
         chmod 0700 ~/.kube
 
         # ensure microk8s is up
-        microk8s status --wait-ready
+        sudo microk8s status --wait-ready
 
         # enable required addons
-        microk8s enable dns
-        microk8s enable hostpath-storage
+        sudo microk8s enable dns
+        sudo microk8s enable hostpath-storage
         sudo apt install jq
-        IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
-        microk8s enable metallb:$IPADDR-$IPADDR
+        #IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
+        #microk8s enable metallb:$IPADDR-$IPADDR
 
         # configure & bootstrap microk8s controller
         sudo mkdir -p /var/snap/juju/current/microk8s/credentials
-        microk8s config | sudo tee /var/snap/juju/current/microk8s/credentials/client.config
-        sudo chown -R $USER:$USER /var/snap/juju/current/microk8s/credentials
+        sudo microk8s config | sudo tee /var/snap/juju/current/microk8s/credentials/client.config
+        sudo chown -R {user_env_var}:{user_env_var} /var/snap/juju/current/microk8s/credentials
 
         juju bootstrap microk8s
     """
