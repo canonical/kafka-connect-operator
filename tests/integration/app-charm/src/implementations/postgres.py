@@ -41,7 +41,7 @@ class Integrator(BaseIntegrator):
     formatter = PostgresConfigFormatter
     mode = "sink"
 
-    DB_CLIENT_REL = "postgres"
+    DB_CLIENT_REL = "sink"
     DB_NAME = "sink_db"
 
     def __init__(self, charm: CharmBase, plugin_url: str):
