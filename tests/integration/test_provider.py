@@ -87,7 +87,7 @@ async def test_rest_endpoints_before_integration(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_integrate(ops_test: OpsTest, request: pytest.FixtureRequest):
     """Tests the integration functionality between Kafka Connect and integrator charm."""
-    await ops_test.model.add_relation(APP_NAME, f"{INTEGRATOR_APP}:source")
+    await ops_test.model.add_relation(APP_NAME, INTEGRATOR_APP)
 
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
