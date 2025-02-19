@@ -26,7 +26,7 @@ CHANNEL = "edge/upgrade"
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip("charm needs to be released to stable before enabling")
-async def test_in_place_upgrade(ops_test: OpsTest, kafka_charm, kafka_connect_charm):
+async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
     # deploy kafka & kafka-connect
     await asyncio.gather(
         ops_test.model.deploy(
