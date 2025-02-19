@@ -131,7 +131,10 @@ class ConnectManager:
         # the checksum here corresponds to a sha256sum of an empty tar files created using --files-from /dev/null
         # this is what is loaded by default as the connect-plugin resource in Charmhub
         # as Charmhub won't allow charms without a resource
-        if self._plugin_checksum(resource_path) == "84ff92691f909a05b224e1c56abb4864f01b4f8e3c854e4bb4c7baf1d3f6d652":
+        if (
+            self._plugin_checksum(resource_path)
+            == "84ff92691f909a05b224e1c56abb4864f01b4f8e3c854e4bb4c7baf1d3f6d652"
+        ):
             logger.debug("Plugin is empty, skipping...")
             return
 
