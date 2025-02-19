@@ -16,5 +16,5 @@ logger = logging.getLogger(__name__)
 async def test_deploy_charms(ops_test: OpsTest, juju_microk8s):
     logger.info("Microk8s controller set up successfully!")
 
-    os.system("juju switch microk8s-localhost")
+    os.system("juju switch localhost-localhost")
     os.system("juju models")
