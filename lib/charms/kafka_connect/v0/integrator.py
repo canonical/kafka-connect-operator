@@ -269,9 +269,7 @@ class ConnectClient:
             return TaskStatus.UNASSIGNED
 
         if status_response.status_code != 200:
-            logger.error(
-                f"Unable to fetch tasks status, details: {status_response.content}"
-            )
+            logger.error(f"Unable to fetch tasks status, details: {status_response.content}")
             return TaskStatus.UNKNOWN
 
         state = status_response.json().get("state", "UNASSIGNED")
