@@ -87,7 +87,6 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
         )
 
 
-@pytest.mark.skip
 @pytest.mark.abort_on_fail
 async def test_deploy_source_integrator(ops_test: OpsTest, integrator_charm):
     """Deploys MySQL source integrator."""
@@ -113,7 +112,6 @@ async def test_deploy_source_integrator(ops_test: OpsTest, integrator_charm):
     await load_implementation(ops_test, unit, "mysql")
 
 
-@pytest.mark.skip
 @pytest.mark.abort_on_fail
 async def test_activate_source_integrator(ops_test: OpsTest):
     """Checks source integrator becomes active after related with MySQL."""
@@ -128,7 +126,6 @@ async def test_activate_source_integrator(ops_test: OpsTest):
     assert "UNASSIGNED" in ops_test.model.applications[MYSQL_INTEGRATOR].status_message
 
 
-@pytest.mark.skip
 @pytest.mark.abort_on_fail
 @pytest.mark.parametrize(
     "mysql_test_data",
