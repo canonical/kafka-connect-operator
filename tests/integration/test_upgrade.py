@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.broker
 
-CHANNEL = "edge/upgrade"
+CHANNEL = "edge"
 
 
 @pytest.mark.abort_on_fail
@@ -30,6 +30,7 @@ async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
     await asyncio.gather(
         ops_test.model.deploy(
             APP_NAME,
+            channel=CHANNEL,
             application_name=APP_NAME,
             num_units=1,
             series="jammy",
