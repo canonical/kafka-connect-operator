@@ -46,10 +46,15 @@ class Deployment:
             if ret_code:
                 raise OSError(f'command "{command}" failed with error code {ret_code}')
 
-    def juju(self, *args) -> dict:
+    def juju(self, *args, json_output=True) -> dict:
         """Runs a juju command and returns the result in JSON format."""
-        res = self.exec(f"juju {' '.join(args)} --format json")
-        return json.loads(res)
+        _format_json = "" if not json_output else "--format json"
+        res = self.exec(f"juju {' '.join(args)} {_format_json}")
+
+        if json_output:
+            return json.loads(res)
+
+        return {}
 
     def get_controller_name(self, cloud: str) -> Optional[str]:
         """Gets controller name for specified cloud, e.g. localhost, microk8s, lxd, etc."""
@@ -70,7 +75,7 @@ class Deployment:
         try:
             return await self.get_model(controller_name, model_name)
         except JujuConnectionError:
-            self.juju("add-model", "-c", controller_name, model_name)
+            self.juju("add-model", "-c", controller_name, model_name, json_output=False)
             await asyncio.sleep(10)
             return await self.get_model(controller_name, model_name)
 
