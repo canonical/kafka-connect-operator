@@ -119,6 +119,10 @@ async def test_grafana(cos_lite: Model):
 
 @pytest.mark.abort_on_fail
 async def test_metrics_and_alerts(cos_lite: Model):
+    # wait a couple of minutes for metrics to show up
+    logging.info("Sleeping for 5 min.")
+    await asyncio.sleep(300)
+
     traefik_unit = cos_lite.applications["traefik"].units[0]
     action = await traefik_unit.run_action("show-proxied-endpoints")
     response = await action.wait()
@@ -130,7 +134,7 @@ async def test_metrics_and_alerts(cos_lite: Model):
     response = requests.get(f"{prometheus_url}/api/v1/label/__name__/values").json()
     metrics = [i for i in response["data"] if APP in i]
 
-    assert metrics
+    assert metrics, f"No {APP} metrics found!"
     logger.info(f'{len(metrics)} metrics found for "{APP}" in prometheus.')
 
     # alerts
