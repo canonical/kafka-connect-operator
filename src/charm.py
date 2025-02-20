@@ -22,6 +22,7 @@ from events.tls import TLSHandler
 from literals import (
     CHARM_KEY,
     JMX_EXPORTER_PORT,
+    METRICS_RULES_DIR,
     SNAP_NAME,
     SUBSTRATE,
     DebugLevel,
@@ -76,7 +77,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
                 # See https://github.com/canonical/charmed-kafka-snap for details
                 {"path": "/metrics", "port": JMX_EXPORTER_PORT},
             ],
-            metrics_rules_dir="./src/alert_rules/prometheus",
+            metrics_rules_dir=METRICS_RULES_DIR,
             log_slots=[f"{SNAP_NAME}:connect-logs"],
         )
 

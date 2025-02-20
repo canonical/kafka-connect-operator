@@ -76,7 +76,7 @@ class Paths:
     @property
     def jmx_prometheus_config(self) -> str:
         """Path to JMX Prometheus exporter YAML config file."""
-        return f"{self.config_dir}/jmx_exporter_config.yaml"
+        return f"{self.config_dir}/jmx_prometheus.yaml"
 
 
 class WorkloadBase(ABC):

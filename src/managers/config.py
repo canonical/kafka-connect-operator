@@ -83,15 +83,6 @@ class ConfigManager:
 
         self.workload.write(content=self.jaas_config + "\n", path=self.workload.paths.jaas)
 
-    def save_jmx_prometheus_config(self) -> None:
-        """Saves JMX Prometheus config to the `jmx_prometheus_config` path."""
-        raw = self.workload.read(
-            f"{self.workload.paths.charm_dir}/src/cos_config/jmx_prometheus_config.yaml"
-        )
-        self.workload.write(
-            content="\n".join(raw) + "\n", path=self.workload.paths.jmx_prometheus_config
-        )
-
     def save_properties(self) -> None:
         """Writes all Kafka Connect config properties to the `connect-distributed.properties` path."""
         self.workload.write(
@@ -102,7 +93,6 @@ class ConfigManager:
         """Make all steps necessary to start the Connect service, including setting env vars, JAAS config and service config files."""
         self.workload.set_environment(env_vars=[self.kafka_opts])
         self.save_jaas_config()
-        self.save_jmx_prometheus_config()
         self.save_properties()
 
     @property
