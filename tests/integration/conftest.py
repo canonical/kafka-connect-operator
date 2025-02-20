@@ -14,6 +14,15 @@ from pytest_operator.plugin import OpsTest
 logger = logging.getLogger(__name__)
 
 
+def pytest_addoption(parser):
+    """Defines pytest parsers."""
+    parser.addoption("--cos-model", action="store", help="COS model name", default="cos")
+
+    parser.addoption(
+        "--cos-channel", action="store", help="COS-lite bundle channel", default="edge"
+    )
+
+
 @pytest.fixture(scope="module")
 async def kafka_connect_charm(ops_test: OpsTest):
     """Build the application charm."""
@@ -47,9 +56,10 @@ def microk8s_controller(testbed: Testbed):
 
 
 @pytest.fixture(scope="module")
-async def cos_lite(microk8s_controller: str, testbed: Testbed):
+async def cos_lite(microk8s_controller: str, testbed: Testbed, request: pytest.FixtureRequest):
     """Returns the COS-lite model, deploys a new one if not existent."""
-    cos_model_name = "cos"
+    cos_model_name = f'{request.config.getoption("--cos-model")}'
+    cos_channel = f'{request.config.getoption("--cos-channel")}'
 
     try:
         model = await testbed.get_model(microk8s_controller, cos_model_name)
@@ -70,7 +80,7 @@ async def cos_lite(microk8s_controller: str, testbed: Testbed):
         curl -L https://raw.githubusercontent.com/canonical/cos-lite-bundle/main/overlays/offers-overlay.yaml -O
         curl -L https://raw.githubusercontent.com/canonical/cos-lite-bundle/main/overlays/storage-small-overlay.yaml -O
 
-        juju deploy cos-lite --trust --overlay ./offers-overlay.yaml --overlay ./storage-small-overlay.yaml
+        juju deploy cos-lite --channel {cos_channel} --trust --overlay ./offers-overlay.yaml --overlay ./storage-small-overlay.yaml
 
         rm ./offers-overlay.yaml ./storage-small-overlay.yaml
     """
