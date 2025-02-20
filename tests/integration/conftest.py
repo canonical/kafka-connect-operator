@@ -3,11 +3,14 @@
 # See LICENSE file for licensing details.
 
 
+import asyncio
 import logging
 import os
 import subprocess
 
 import pytest
+from deployment import Deployment
+from juju.errors import JujuConnectionError
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
@@ -30,7 +33,19 @@ async def integrator_charm(ops_test: OpsTest):
 
 
 @pytest.fixture(scope="session")
-def juju_microk8s():
+def deployment():
+    return Deployment()
+
+
+@pytest.fixture(scope="module")
+def microk8s_controller(deployment: Deployment):
+    """Returns the microk8s controller name, boots up a new one if not existent."""
+    if deployment.microk8s_controller:
+        logger.info(
+            f"Microk8s controller {deployment.microk8s_controller} exists, skipping setup..."
+        )
+        return deployment.microk8s_controller
+
     user_env_var = os.environ.get("USER", "root")
     os.system("sudo apt install -y jq")
     ip_addr = subprocess.check_output(
@@ -40,7 +55,8 @@ def juju_microk8s():
         shell=True,
     ).strip()
 
-    setup_commands = f"""
+    deployment.run_script(
+        f"""
         # install microk8s
         sudo snap install microk8s --classic --channel=1.32
 
@@ -64,28 +80,58 @@ def juju_microk8s():
 
         juju bootstrap microk8s
         sleep 90
+    """
+    )
 
-        # deploy COS
-        juju switch microk8s-localhost
-        juju add-model cos
-        juju switch cos
+    return "microk8s-localhost"
+
+
+@pytest.fixture(scope="module")
+async def cos_lite(microk8s_controller: str, deployment: Deployment):
+    """Returns the COS-lite model, deploys a new one if not existent."""
+    cos_model_name = "cos"
+
+    try:
+        model = await deployment.get_model(microk8s_controller, cos_model_name)
+        yield model
+
+        await model.disconnect()
+        return
+    except JujuConnectionError:
+        logger.info(f"Model {cos_model_name} doesn't exist, trying to deploy...")
+
+    deployment.run_script(
+        f"""
+        # deploy COS-Lite
+        juju switch {microk8s_controller}
+        juju add-model {cos_model_name}
+        juju switch {cos_model_name}
 
         curl -L https://raw.githubusercontent.com/canonical/cos-lite-bundle/main/overlays/offers-overlay.yaml -O
         curl -L https://raw.githubusercontent.com/canonical/cos-lite-bundle/main/overlays/storage-small-overlay.yaml -O
 
         juju deploy cos-lite --trust --overlay ./offers-overlay.yaml --overlay ./storage-small-overlay.yaml
-        sleep 300
-        juju status --relations
+
+        rm ./offers-overlay.yaml ./storage-small-overlay.yaml
     """
+    )
 
-    for line in setup_commands.split("\n"):
-        command = line.strip()
+    await asyncio.sleep(60)
+    model = await deployment.get_model(microk8s_controller, cos_model_name)
 
-        if not command or command.startswith("#"):
-            continue
+    await model.wait_for_idle(status="active", idle_period=60, timeout=3000, raise_on_error=False)
+    yield model
 
-        logger.info(command)
-        ret_code = os.system(command)
+    await model.disconnect()
 
-        if ret_code:
-            raise OSError(f'command "{command}" failed with error code {ret_code}')
+
+@pytest.fixture(scope="module")
+async def test_model(ops_test: OpsTest, deployment: Deployment):
+    """Returns the ops_test model on lxd cloud."""
+    if not deployment.lxd_controller or not ops_test.model:
+        raise Exception("Can't communicate with the controller.")
+
+    model = await deployment.get_or_create_model(deployment.lxd_controller, ops_test.model.name)
+    yield model
+
+    await model.disconnect()
