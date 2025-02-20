@@ -2,32 +2,24 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import json
 import logging
-import os
-import subprocess
 
 import pytest
-from pytest_operator.plugin import OpsTest
+from deployment import Deployment
+from juju.model import Model
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_deploy_charms(ops_test: OpsTest, juju_microk8s):
-    logger.info("Microk8s controller set up successfully!")
+async def test_deploy_charms(deployment: Deployment, cos_lite: Model, test_model: Model):
 
-    raw = subprocess.check_output(
-        "juju controllers --format json | jq -r '.controllers | keys'",
-        shell=True,
-        universal_newlines=True,
+    await test_model.deploy(
+        "kafka", "kafka", channel="3/edge", config={"roles": "broker,controller"}
     )
-    controllers = json.loads(raw)
 
-    lxd_controller = None
-    if match := [k for k in controllers if k != "microk8s-localhost"]:
-        lxd_controller = match[0]
+    await test_model.wait_for_idle(status="active", idle_period=60, timeout=1200)
 
-    os.system(f"juju switch {lxd_controller}")
-    os.system("juju models")
+    print(f"juju status --relations -m {deployment.lxd_controller}:{test_model.name}")
+    print(f"juju status --relations -m {deployment.microk8s_controller}:{cos_lite.name}")
