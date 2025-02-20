@@ -3,8 +3,10 @@
 # See LICENSE file for licensing details.
 
 import asyncio
+import json
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import requests
@@ -22,7 +24,8 @@ PROMETHEUS_OFFER = "prometheus-receive-remote-write"
 LOKI_OFFER = "loki-logging"
 GRAFANA_OFFER = "grafana-dashboards"
 
-# Grafana assertions
+# assertions
+APP = "kafka"
 DASHBOARD_TITLE = "Kafka Metrics"
 PANELS_COUNT = 44
 PANELS_TO_CHECK = (
@@ -30,6 +33,11 @@ PANELS_TO_CHECK = (
     "Brokers Online",
     "Active Controllers",
     "Total of Topics",
+)
+ALERTS_COUNT = 24
+LOG_STREAMS = (
+    "/var/snap/charmed-kafka/common/var/log/kafka/kafkaServer-gc.log",
+    "/var/snap/charmed-kafka/common/var/log/kafka/server.log",
 )
 
 
@@ -63,6 +71,7 @@ async def test_deploy_charms(testbed: Testbed, cos_lite: Model, test_model: Mode
     os.system(f"juju status --relations -m {testbed.microk8s_controller}:{cos_lite.name}")
 
 
+@pytest.mark.abort_on_fail
 async def test_grafana(cos_lite: Model):
     grafana_unit = cos_lite.applications["grafana"].units[0]
     action = await grafana_unit.run_action("get-admin-password")
@@ -72,7 +81,7 @@ async def test_grafana(cos_lite: Model):
     admin_password = response.results.get("admin-password")
 
     auth = HTTPBasicAuth("admin", admin_password)
-    dashboards = requests.get(f"{grafana_url}/api/search?query=kafka", auth=auth).json()
+    dashboards = requests.get(f"{grafana_url}/api/search?query={APP}", auth=auth).json()
 
     assert dashboards
 
@@ -102,3 +111,73 @@ async def test_grafana(cos_lite: Model):
 
     for item in PANELS_TO_CHECK:
         assert item in panel_titles
+
+    logger.info(f"{DASHBOARD_TITLE} dashboard has following panels:")
+    for panel in panel_titles:
+        logger.info(f"|__ {panel}")
+
+
+@pytest.mark.abort_on_fail
+async def test_metrics_and_alerts(cos_lite: Model):
+    traefik_unit = cos_lite.applications["traefik"].units[0]
+    action = await traefik_unit.run_action("show-proxied-endpoints")
+    response = await action.wait()
+
+    prometheus_url = json.loads(response.results["proxied-endpoints"])["prometheus/0"]["url"]
+
+    # metrics
+
+    response = requests.get(f"{prometheus_url}/api/v1/label/__name__/values").json()
+    metrics = [i for i in response["data"] if APP in i]
+
+    assert metrics
+    logger.info(f'{len(metrics)} metrics found for "{APP}" in prometheus.')
+
+    # alerts
+
+    response = requests.get(f"{prometheus_url}/api/v1/rules?type=alert").json()
+
+    match = [group for group in response["data"]["groups"] if APP in group["name"].lower()]
+
+    assert match
+
+    kafka_alerts = match[0]
+
+    assert len(kafka_alerts["rules"]) == ALERTS_COUNT
+
+    logger.info("Following alert rules are registered:")
+    for rule in kafka_alerts["rules"]:
+        logger.info(f'|__ {rule["name"]}')
+
+
+@pytest.mark.abort_on_fail
+async def test_loki(cos_lite: Model):
+    traefik_unit = cos_lite.applications["traefik"].units[0]
+    action = await traefik_unit.run_action("show-proxied-endpoints")
+    response = await action.wait()
+
+    loki_url = json.loads(response.results["proxied-endpoints"])["loki/0"]["url"]
+
+    endpoint = f"{loki_url}/loki/api/v1/query_range"
+    headers = {"Accept": "application/json"}
+
+    start_time = (datetime.now(timezone.utc) - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    payload = {"query": f'{{juju_application="{APP}"}} |= ``', "start": start_time}
+
+    response = requests.get(endpoint, params=payload, headers=headers, verify=False)
+    results = response.json()["data"]["result"]
+    streams = [i["stream"]["filename"] for i in results]
+
+    assert len(streams) >= len(LOG_STREAMS)
+    for _stream in LOG_STREAMS:
+        assert _stream in streams
+
+    logger.info("Displaying some of the logs pushed to loki:")
+    for item in results:
+        # we should have some logs
+        assert len(item["values"]) > 0, f'No log pushed for {item["stream"]["filename"]}'
+
+        logger.info(f'Stream: {item["stream"]["filename"]}')
+        for _, log in item["values"][:10]:
+            logger.info(f"|__ {log}")
+        logger.info("\n")
