@@ -27,7 +27,7 @@ GRAFANA_OFFER = "grafana-dashboards"
 
 # assertions
 DASHBOARD_TITLE = "Kafka Connect Cluster"
-PANELS_COUNT = 0
+PANELS_COUNT = 53
 PANELS_TO_CHECK = (
     "Tasks Total",
     "Tasks Running",
@@ -101,7 +101,7 @@ async def test_grafana(cos_lite: Model):
 
     panels = details["dashboard"]["panels"]
 
-    # assert len(panels) == PANELS_COUNT
+    assert len(panels) == PANELS_COUNT
 
     panel_titles = [_panel.get("title") for _panel in panels]
 
@@ -135,7 +135,7 @@ async def test_metrics_and_alerts(cos_lite: Model):
     # metrics
 
     response = requests.get(f"{prometheus_url}/api/v1/label/__name__/values").json()
-    metrics = [i for i in response["data"] if APP_NAME in i]
+    metrics = [i for i in response["data"] if APP_NAME.replace("-", "_") in i]
 
     assert metrics, f"No {APP_NAME} metrics found!"
     logger.info(f'{len(metrics)} metrics found for "{APP_NAME}" in prometheus.')
