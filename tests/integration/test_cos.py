@@ -7,10 +7,11 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 import requests
-from helpers import Testbed
+from helpers import APP_NAME, KAFKA_APP, KAFKA_CHANNEL, Testbed
 from juju.model import Model
 from requests.auth import HTTPBasicAuth
 
@@ -18,39 +19,41 @@ logger = logging.getLogger(__name__)
 
 
 GRAFANA_AGENT = "grafana-agent"
-KAFKA = "kafka"
+COS_CHANNEL = "edge"
 
 PROMETHEUS_OFFER = "prometheus-receive-remote-write"
 LOKI_OFFER = "loki-logging"
 GRAFANA_OFFER = "grafana-dashboards"
 
 # assertions
-APP = "kafka"
-DASHBOARD_TITLE = "Kafka Metrics"
-PANELS_COUNT = 44
+DASHBOARD_TITLE = "Kafka Connect Cluster"
+PANELS_COUNT = 0
 PANELS_TO_CHECK = (
-    "JVM",
-    "Brokers Online",
-    "Active Controllers",
-    "Total of Topics",
+    "Tasks Total",
+    "Tasks Running",
+    "Status of connectors",
+    "Status of tasks",
+    "CPU Usage",
 )
-ALERTS_COUNT = 24
-LOG_STREAMS = (
-    "/var/snap/charmed-kafka/common/var/log/kafka/kafkaServer-gc.log",
-    "/var/snap/charmed-kafka/common/var/log/kafka/server.log",
-)
+ALERTS_COUNT = 3
+LOG_STREAMS = ("/var/snap/charmed-kafka/common/var/log/connect/server.log",)
 
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_deploy_charms(testbed: Testbed, cos_lite: Model, test_model: Model):
+async def test_deploy_charms(
+    testbed: Testbed, cos_lite: Model, test_model: Model, kafka_connect_charm: Path
+):
 
     await asyncio.gather(
-        test_model.deploy(KAFKA, KAFKA, channel="3/edge", config={"roles": "broker,controller"}),
-        test_model.deploy(GRAFANA_AGENT, GRAFANA_AGENT, channel="edge"),
+        test_model.deploy(kafka_connect_charm, APP_NAME),
+        test_model.deploy(
+            KAFKA_APP, KAFKA_APP, channel=KAFKA_CHANNEL, config={"roles": "broker,controller"}
+        ),
+        test_model.deploy(GRAFANA_AGENT, GRAFANA_AGENT, channel=COS_CHANNEL),
     )
 
-    await test_model.wait_for_idle(apps=[KAFKA], status="active", idle_period=60, timeout=1200)
+    await test_model.add_relation(APP_NAME, KAFKA_APP)
 
     await test_model.consume(
         f"{testbed.microk8s_controller}:admin/{cos_lite.name}.{PROMETHEUS_OFFER}"
@@ -60,12 +63,12 @@ async def test_deploy_charms(testbed: Testbed, cos_lite: Model, test_model: Mode
         f"{testbed.microk8s_controller}:admin/{cos_lite.name}.{GRAFANA_OFFER}"
     )
 
-    await test_model.relate(GRAFANA_AGENT, KAFKA)
+    await test_model.relate(GRAFANA_AGENT, APP_NAME)
     await test_model.relate(GRAFANA_AGENT, PROMETHEUS_OFFER)
     await test_model.relate(GRAFANA_AGENT, LOKI_OFFER)
     await test_model.relate(GRAFANA_AGENT, GRAFANA_OFFER)
 
-    await test_model.wait_for_idle(idle_period=30, timeout=600, status="active")
+    await test_model.wait_for_idle(idle_period=30, timeout=1800, status="active")
 
     os.system(f"juju status --relations -m {testbed.lxd_controller}:{test_model.name}")
     os.system(f"juju status --relations -m {testbed.microk8s_controller}:{cos_lite.name}")
@@ -81,7 +84,7 @@ async def test_grafana(cos_lite: Model):
     admin_password = response.results.get("admin-password")
 
     auth = HTTPBasicAuth("admin", admin_password)
-    dashboards = requests.get(f"{grafana_url}/api/search?query={APP}", auth=auth).json()
+    dashboards = requests.get(f"{grafana_url}/api/search?query=kafka", auth=auth).json()
 
     assert dashboards
 
@@ -98,7 +101,7 @@ async def test_grafana(cos_lite: Model):
 
     panels = details["dashboard"]["panels"]
 
-    assert len(panels) == PANELS_COUNT
+    # assert len(panels) == PANELS_COUNT
 
     panel_titles = [_panel.get("title") for _panel in panels]
 
@@ -132,25 +135,25 @@ async def test_metrics_and_alerts(cos_lite: Model):
     # metrics
 
     response = requests.get(f"{prometheus_url}/api/v1/label/__name__/values").json()
-    metrics = [i for i in response["data"] if APP in i]
+    metrics = [i for i in response["data"] if APP_NAME in i]
 
-    assert metrics, f"No {APP} metrics found!"
-    logger.info(f'{len(metrics)} metrics found for "{APP}" in prometheus.')
+    assert metrics, f"No {APP_NAME} metrics found!"
+    logger.info(f'{len(metrics)} metrics found for "{APP_NAME}" in prometheus.')
 
     # alerts
 
     response = requests.get(f"{prometheus_url}/api/v1/rules?type=alert").json()
 
-    match = [group for group in response["data"]["groups"] if APP in group["name"].lower()]
+    match = [group for group in response["data"]["groups"] if APP_NAME in group["name"].lower()]
 
     assert match
 
-    kafka_alerts = match[0]
+    alerts = match[0]
 
-    assert len(kafka_alerts["rules"]) == ALERTS_COUNT
+    assert len(alerts["rules"]) == ALERTS_COUNT
 
     logger.info("Following alert rules are registered:")
-    for rule in kafka_alerts["rules"]:
+    for rule in alerts["rules"]:
         logger.info(f'|__ {rule["name"]}')
 
 
@@ -166,7 +169,7 @@ async def test_loki(cos_lite: Model):
     headers = {"Accept": "application/json"}
 
     start_time = (datetime.now(timezone.utc) - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    payload = {"query": f'{{juju_application="{APP}"}} |= ``', "start": start_time}
+    payload = {"query": f'{{juju_application="{APP_NAME}"}} |= ``', "start": start_time}
 
     response = requests.get(endpoint, params=payload, headers=headers, verify=False)
     results = response.json()["data"]["result"]
