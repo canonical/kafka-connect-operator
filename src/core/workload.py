@@ -4,7 +4,6 @@
 
 """Workload base interface definition."""
 
-import os
 import re
 import secrets
 import string
