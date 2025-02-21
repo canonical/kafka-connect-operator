@@ -22,10 +22,10 @@ from events.tls import TLSHandler
 from events.upgrade import ConnectDependencyModel, ConnectUpgrade
 from literals import (
     CHARM_KEY,
+    DEPENDENCIES,
     JMX_EXPORTER_PORT,
     METRICS_RULES_DIR,
     SNAP_NAME,
-    DEPENDENCIES,
     SUBSTRATE,
     DebugLevel,
     Status,
