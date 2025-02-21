@@ -19,8 +19,10 @@ from core.structured_config import CharmConfig
 from events.connect import ConnectHandler
 from events.kafka import KafkaHandler
 from events.tls import TLSHandler
+from events.upgrade import ConnectDependencyModel, ConnectUpgrade
 from literals import (
     CHARM_KEY,
+    DEPENDENCIES,
     JMX_EXPORTER_PORT,
     METRICS_RULES_DIR,
     SNAP_NAME,
@@ -69,6 +71,13 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.connect = ConnectHandler(self)
         self.kafka = KafkaHandler(self)
         self.tls = TLSHandler(self)
+        self.upgrade = ConnectUpgrade(
+            self,
+            substrate=self.substrate,
+            dependency_model=ConnectDependencyModel(
+                **DEPENDENCIES  # pyright: ignore[reportArgumentType]
+            ),
+        )
 
         self.cos_agent = COSAgentProvider(
             self,

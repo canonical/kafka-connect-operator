@@ -80,3 +80,13 @@ class Status(Enum):
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("Worker service is not running"), "WARNING")
 
     ACTIVE = StatusLevel(ActiveStatus(), "DEBUG")
+
+
+DEPENDENCIES = {
+    "connect_service": {
+        "dependencies": {},  # do not need to check Kafka, backwards compatible since 0.10
+        "name": "connect",
+        "upgrade_supported": "^3.9",
+        "version": "3.9.0",
+    },
+}

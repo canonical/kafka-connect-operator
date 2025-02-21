@@ -62,6 +62,12 @@ def patched_snap(monkeypatch):
         yield
 
 
+@pytest.fixture(autouse=True)
+def tenacity_wait():
+    with patch("tenacity.nap.time") as patched_nap:
+        yield patched_nap
+
+
 @pytest.fixture(scope="module")
 def kafka_client_rel():
     return {
