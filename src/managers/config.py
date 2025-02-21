@@ -15,6 +15,7 @@ from literals import (
     DEFAULT_AUTH_CLASS,
     DEFAULT_CONVERTER_CLASS,
     GROUP_ID,
+    JMX_EXPORTER_PORT,
     REPLICATION_FACTOR,
     TOPICS,
     ClientModes,
@@ -129,11 +130,16 @@ class ConfigManager:
         )
 
     @property
+    def jmx_opts(self) -> list[str]:
+        """The JMX options for configuring the prometheus exporter."""
+        return [
+            f"-javaagent:{self.workload.paths.jmx_prometheus_javaagent}={JMX_EXPORTER_PORT}:{self.workload.paths.jmx_prometheus_config}",
+        ]
+
+    @property
     def kafka_opts(self) -> str:
         """Returns all necessary options for KAFKA_OPTS env var."""
-        opts = [
-            f"-Djava.security.auth.login.config={self.workload.paths.jaas}",
-        ]
+        opts = [f"-Djava.security.auth.login.config={self.workload.paths.jaas}", *self.jmx_opts]
 
         return f"KAFKA_OPTS='{' '.join(opts)}'"
 

@@ -12,7 +12,7 @@ from typing import Iterable
 
 from ops.pebble import Layer
 
-from literals import CONFIG_DIR, PLUGIN_PATH
+from literals import CONFIG_DIR, PLUGIN_PATH, SNAP_NAME
 
 
 class Paths:
@@ -21,6 +21,11 @@ class Paths:
     def __init__(self, config_dir: str = CONFIG_DIR):
 
         self.config_dir = config_dir
+
+    @property
+    def snap_dir(self) -> str:
+        """Path to Kafka & Kafka connect snap's base dir."""
+        return f"/snap/{SNAP_NAME}/current/opt/kafka"
 
     @property
     def env(self) -> str:
@@ -56,6 +61,16 @@ class Paths:
     def passwords(self) -> str:
         """Path to passwords file store when using PropertyFileLoginModule."""
         return f"{self.config_dir}/connect.password"
+
+    @property
+    def jmx_prometheus_javaagent(self) -> str:
+        """Path to JMX Prometheus exporter java agent."""
+        return f"{self.snap_dir}/libs/jmx_prometheus_javaagent.jar"
+
+    @property
+    def jmx_prometheus_config(self) -> str:
+        """Path to JMX Prometheus exporter YAML config file."""
+        return f"{self.config_dir}/jmx_prometheus.yaml"
 
 
 class WorkloadBase(ABC):

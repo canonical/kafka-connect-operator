@@ -90,7 +90,8 @@ def test_provider_on_relation_changed(
         assert charm.context.clients[relation_id].password == "password"
         assert auth_manager_mock.update.call_count > 0
 
-    assert len(state_out.deferred) == 1 + int(is_leader)
+    deferred_count = 2 if is_leader and not initial_data else 1
+    assert len(state_out.deferred) == deferred_count
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
 
 

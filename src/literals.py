@@ -12,7 +12,7 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 
 CHARM_KEY = "kafka-connect"
 SNAP_NAME = "charmed-kafka"
-CHARMED_KAFKA_SNAP_REVISION = "49"
+CHARMED_KAFKA_SNAP_REVISION = "57"
 CONTAINER = "kafka-connect"
 SUBSTRATE = "vm"
 
@@ -37,6 +37,8 @@ SERVICE_NAME = "connect-distributed"
 PLUGIN_RESOURCE_KEY = "connect-plugin"
 PLUGIN_PATH = f"/var/snap/{SNAP_NAME}/common/var/lib/connect/plugins/"
 CONFIG_DIR = f"/var/snap/{SNAP_NAME}/current/etc/connect"
+JMX_EXPORTER_PORT = 9100
+METRICS_RULES_DIR = "./src/alert_rules/prometheus"
 
 TOPICS = {"offset": "connect-offset", "config": "connect-config", "status": "connect-status"}
 REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
