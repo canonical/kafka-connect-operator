@@ -24,11 +24,6 @@ class Paths:
         self.config_dir = config_dir
 
     @property
-    def charm_dir(self) -> str:
-        """Path to charm's source."""
-        return os.environ.get("CHARM_DIR", "")
-
-    @property
     def snap_dir(self) -> str:
         """Path to Kafka & Kafka connect snap's base dir."""
         return f"/snap/{SNAP_NAME}/current/opt/kafka"
