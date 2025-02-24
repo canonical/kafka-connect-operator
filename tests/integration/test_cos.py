@@ -35,7 +35,7 @@ PANELS_TO_CHECK = (
     "Status of tasks",
     "CPU Usage",
 )
-ALERTS_COUNT = 3
+ALERTS_COUNT = 5
 LOG_STREAMS = ("/var/snap/charmed-kafka/common/var/log/connect/server.log",)
 
 
@@ -105,9 +105,9 @@ async def test_grafana(cos_lite: Model):
 
     panel_titles = [_panel.get("title") for _panel in panels]
 
-    logger.warning(
-        f"{len([i for i in panel_titles if not i])} panels don't have title which might be an issue."
-    )
+    if untitled := [i for i in panel_titles if not i]:
+        logger.warning(f"{len(untitled)} panels don't have title which might be an issue.")
+
     logger.warning(
         f'{len([i for i in panel_titles if i and i.title() != i])} panels don\'t observe "Panel Title" format.'
     )
@@ -133,9 +133,9 @@ async def test_metrics_and_alerts(cos_lite: Model):
     prometheus_url = json.loads(response.results["proxied-endpoints"])["prometheus/0"]["url"]
 
     # metrics
-
+    app_name_with_underlines = APP_NAME.replace("-", "_")
     response = requests.get(f"{prometheus_url}/api/v1/label/__name__/values").json()
-    metrics = [i for i in response["data"] if APP_NAME.replace("-", "_") in i]
+    metrics = [i for i in response["data"] if app_name_with_underlines in i]
 
     assert metrics, f"No {APP_NAME} metrics found!"
     logger.info(f'{len(metrics)} metrics found for "{APP_NAME}" in prometheus.')
@@ -144,16 +144,20 @@ async def test_metrics_and_alerts(cos_lite: Model):
 
     response = requests.get(f"{prometheus_url}/api/v1/rules?type=alert").json()
 
-    match = [group for group in response["data"]["groups"] if APP_NAME in group["name"].lower()]
+    match = [
+        group
+        for group in response["data"]["groups"]
+        if app_name_with_underlines in group["name"].lower()
+    ]
 
     assert match
 
-    alerts = match[0]
+    alert_rules = [rule for _item in match for rule in _item["rules"]]
 
-    assert len(alerts["rules"]) == ALERTS_COUNT
+    assert len(alert_rules) == ALERTS_COUNT
 
     logger.info("Following alert rules are registered:")
-    for rule in alerts["rules"]:
+    for rule in alert_rules:
         logger.info(f'|__ {rule["name"]}')
 
 
