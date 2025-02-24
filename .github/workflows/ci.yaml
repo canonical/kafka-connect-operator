@@ -50,7 +50,8 @@ jobs:
         path:
           - .
           - integrator/
-          - tests/integration/app-charm/
+          - tests/integration/source-integrator-charm/
+          - tests/integration/sink-integrator-charm/
 
   integration-test:
     strategy:
@@ -62,6 +63,8 @@ jobs:
           - integration-plugins
           - integration-provider
           - integration-upgrade
+          - integration-requirer
+
     name: ${{ matrix.tox-environments }}
     needs:
       - lint

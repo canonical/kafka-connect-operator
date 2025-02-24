@@ -28,7 +28,9 @@ PASSWORD_CACHE_KEY = "integrator-password"
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_deploy_app_and_integrator(ops_test: OpsTest, kafka_connect_charm, integrator_charm):
+async def test_deploy_app_and_integrator(
+    ops_test: OpsTest, kafka_connect_charm, source_integrator_charm
+):
 
     # download JDBC connector plugin and deploy the integrator charm with it.
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -38,9 +40,10 @@ async def test_deploy_app_and_integrator(ops_test: OpsTest, kafka_connect_charm,
         logging.info("Download finished successfully.")
 
         await ops_test.model.deploy(
-            integrator_charm,
+            source_integrator_charm,
             application_name=INTEGRATOR_APP,
             resources={PLUGIN_RESOURCE_KEY: plugin_path},
+            config={"mode": "source"},
         )
 
     # deploy kafka & kafka connect
@@ -64,7 +67,8 @@ async def test_deploy_app_and_integrator(ops_test: OpsTest, kafka_connect_charm,
         )
 
     assert ops_test.model.applications[APP_NAME].status == "active"
-    assert ops_test.model.applications[INTEGRATOR_APP].status == "active"
+    # dummy integrator boots up with blocked status, because BaseIntegrator.ready returns False.
+    assert ops_test.model.applications[INTEGRATOR_APP].status == "blocked"
 
 
 @pytest.mark.abort_on_fail
@@ -86,7 +90,7 @@ async def test_rest_endpoints_before_integration(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_integrate(ops_test: OpsTest, request: pytest.FixtureRequest):
     """Tests the integration functionality between Kafka Connect and integrator charm."""
-    await ops_test.model.add_relation(APP_NAME, f"{INTEGRATOR_APP}:source")
+    await ops_test.model.add_relation(APP_NAME, INTEGRATOR_APP)
 
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
