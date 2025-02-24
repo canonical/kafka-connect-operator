@@ -49,7 +49,8 @@ jobs:
       matrix:
         path:
           - .
-          - tests/integration/app-charm/
+          - tests/integration/source-integrator-charm/
+          - tests/integration/sink-integrator-charm/
 
   integration-test:
     strategy:
