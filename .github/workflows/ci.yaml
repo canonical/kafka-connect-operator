@@ -58,6 +58,7 @@ jobs:
       matrix:
         tox-environments:
           - integration-charm
+          - integration-cos
           - integration-tls
           - integration-plugins
           - integration-provider
