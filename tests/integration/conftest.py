@@ -21,9 +21,17 @@ async def kafka_connect_charm(ops_test: OpsTest):
 
 
 @pytest.fixture(scope="module")
-async def integrator_charm(ops_test: OpsTest):
-    """Build the integrator charm."""
-    charm_path = "./tests/integration/app-charm/"
+async def source_integrator_charm(ops_test: OpsTest):
+    """Build the source (MySQL) integrator charm."""
+    charm_path = "./tests/integration/source-integrator-charm/"
+    charm = await ops_test.build_charm(charm_path)
+    return charm
+
+
+@pytest.fixture(scope="module")
+async def sink_integrator_charm(ops_test: OpsTest):
+    """Build the sink (PostgreSQL) integrator charm."""
+    charm_path = "./tests/integration/sink-integrator-charm/"
     charm = await ops_test.build_charm(charm_path)
     return charm
 

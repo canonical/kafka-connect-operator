@@ -17,7 +17,6 @@ from helpers import (
     get_unit_ipv4_address,
     run_command_on_unit,
 )
-from ops import Unit
 from pytest_operator.plugin import OpsTest
 
 from literals import PLUGIN_RESOURCE_KEY
@@ -29,22 +28,6 @@ POSTGRES_DB = "sink_db"
 
 
 logger = logging.getLogger(__name__)
-
-
-async def load_implementation(ops_test: OpsTest, unit: Unit, implementation_name: str):
-    """Dynamically load an integrator implementation on specified unit."""
-    logger.info(f"Using {implementation_name} for {unit.name}")
-
-    unit_name_with_dash = unit.name.replace("/", "-")
-    base_path = f"/var/lib/juju/agents/unit-{unit_name_with_dash}/charm/src"
-
-    ret_code, _, _ = await ops_test.juju(
-        "ssh",
-        unit.name,
-        f"sudo cp {base_path}/implementations/{implementation_name}.py {base_path}/integrator.py",
-    )
-
-    assert not ret_code
 
 
 @pytest.mark.abort_on_fail
@@ -88,7 +71,7 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
 
 
 @pytest.mark.abort_on_fail
-async def test_deploy_source_integrator(ops_test: OpsTest, integrator_charm):
+async def test_deploy_source_integrator(ops_test: OpsTest, source_integrator_charm):
     """Deploys MySQL source integrator."""
     with tempfile.TemporaryDirectory() as temp_dir:
         plugin_path = f"{temp_dir}/jdbc-plugin.tar"
@@ -97,9 +80,10 @@ async def test_deploy_source_integrator(ops_test: OpsTest, integrator_charm):
         logging.info("Download finished successfully.")
 
         await ops_test.model.deploy(
-            integrator_charm,
+            source_integrator_charm,
             application_name=MYSQL_INTEGRATOR,
             resources={PLUGIN_RESOURCE_KEY: plugin_path},
+            config={"mode": "source"},
         )
 
     async with ops_test.fast_forward(fast_interval="60s"):
@@ -107,16 +91,12 @@ async def test_deploy_source_integrator(ops_test: OpsTest, integrator_charm):
             apps=[MYSQL_INTEGRATOR], idle_period=30, timeout=1800, status="blocked"
         )
 
-    # Dynamically load `mysql` implementation for this unit
-    unit = ops_test.model.applications[MYSQL_INTEGRATOR].units[0]
-    await load_implementation(ops_test, unit, "mysql")
-
 
 @pytest.mark.abort_on_fail
 async def test_activate_source_integrator(ops_test: OpsTest):
     """Checks source integrator becomes active after related with MySQL."""
     # our source mysql integrator need a mysql_client relation to unblock:
-    await ops_test.model.add_relation(f"{MYSQL_INTEGRATOR}:source", MYSQL_APP)
+    await ops_test.model.add_relation(f"{MYSQL_INTEGRATOR}:data", MYSQL_APP)
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
             apps=[MYSQL_INTEGRATOR, MYSQL_APP], idle_period=30, timeout=600
@@ -155,7 +135,7 @@ async def test_relate_with_connect_starts_source_integrator(ops_test: OpsTest, m
 
 
 @pytest.mark.abort_on_fail
-async def test_deploy_postgres_sink_integrator(ops_test: OpsTest, integrator_charm):
+async def test_deploy_postgres_sink_integrator(ops_test: OpsTest, sink_integrator_charm):
     """Deploys PostgreSQL sink integrator."""
     with tempfile.TemporaryDirectory() as temp_dir:
         plugin_path = f"{temp_dir}/jdbc-plugin.tar"
@@ -164,10 +144,10 @@ async def test_deploy_postgres_sink_integrator(ops_test: OpsTest, integrator_cha
         logging.info("Download finished successfully.")
 
         await ops_test.model.deploy(
-            integrator_charm,
+            sink_integrator_charm,
             application_name=POSTGRES_INTEGRATOR,
             resources={PLUGIN_RESOURCE_KEY: plugin_path},
-            config={"psql_topic_regex": "test_.+"},
+            config={"mode": "sink", "topics_regex": "test_.+"},
         )
 
     async with ops_test.fast_forward(fast_interval="60s"):
@@ -175,16 +155,12 @@ async def test_deploy_postgres_sink_integrator(ops_test: OpsTest, integrator_cha
             apps=[POSTGRES_INTEGRATOR], idle_period=30, timeout=1800, status="blocked"
         )
 
-    # Dynamically load `postgres` implementation for this unit
-    unit = ops_test.model.applications[POSTGRES_INTEGRATOR].units[0]
-    await load_implementation(ops_test, unit, "postgres")
-
 
 @pytest.mark.abort_on_fail
 async def test_activate_sink_integrator(ops_test: OpsTest):
     """Checks sink integrator becomes active after related with PostgreSQL."""
     # our sink postgres integrator need a postgresql relation to unblock:
-    await ops_test.model.add_relation(f"{POSTGRES_INTEGRATOR}:sink", POSTGRES_APP)
+    await ops_test.model.add_relation(f"{POSTGRES_INTEGRATOR}:data", POSTGRES_APP)
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
             apps=[MYSQL_INTEGRATOR, MYSQL_APP], idle_period=30, timeout=600

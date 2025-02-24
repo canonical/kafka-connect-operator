@@ -2,18 +2,16 @@
 # See LICENSE file for licensing details.
 
 options:
-  mysql_topic_prefix:
+  mode:
+    type: string
+    default: source
+    description: Either `source` or `sink`
+  topic_prefix:
     type: string
     default: test_
-  mysql_mode:
+  select_mode:
     type: string
     default: incrementing
-  mysql_incrementing_column:
+  incrementing_column:
     type: string
     default: id
-  psql_mode:
-    type: string
-    default: insert
-  psql_topic_regex:
-    type: string
-    default: prefix.+
