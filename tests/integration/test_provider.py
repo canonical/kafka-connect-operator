@@ -28,7 +28,9 @@ PASSWORD_CACHE_KEY = "integrator-password"
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_deploy_app_and_integrator(ops_test: OpsTest, kafka_connect_charm, integrator_charm):
+async def test_deploy_app_and_integrator(
+    ops_test: OpsTest, kafka_connect_charm, source_integrator_charm
+):
 
     # download JDBC connector plugin and deploy the integrator charm with it.
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -38,9 +40,10 @@ async def test_deploy_app_and_integrator(ops_test: OpsTest, kafka_connect_charm,
         logging.info("Download finished successfully.")
 
         await ops_test.model.deploy(
-            integrator_charm,
+            source_integrator_charm,
             application_name=INTEGRATOR_APP,
             resources={PLUGIN_RESOURCE_KEY: plugin_path},
+            config={"mode": "source"},
         )
 
     # deploy kafka & kafka connect
