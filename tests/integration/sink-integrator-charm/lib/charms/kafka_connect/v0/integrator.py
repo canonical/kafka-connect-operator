@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping
 from enum import Enum
 from functools import cached_property
-from typing import Any, Iterable, Literal, Optional
+from typing import Any, Iterable, Literal, Optional, cast
 
 import requests
 from charms.data_platform_libs.v0.data_interfaces import (
@@ -27,6 +27,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 from ops.charm import CharmBase, RelationBrokenEvent
 from ops.framework import Object
 from ops.model import ConfigData, Relation
+from pydantic import BaseModel
 from requests.auth import HTTPBasicAuth
 
 # The unique Charmhub library identifier, never change it
@@ -117,37 +118,77 @@ class ClientContext:
         return self.relation_data.get("password", "")
 
 
+class BasePluginServer(ABC):
+    """Base interface for plugin server service."""
+
+    plugin_url: str
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def start(self) -> None:
+        """Starts the plugin server service."""
+        ...
+
+    @abstractmethod
+    def stop(self) -> None:
+        """Stops the plugin server service."""
+        ...
+
+    @abstractmethod
+    def configure(self) -> None:
+        """Makes all necessary configurations to start the server service."""
+        ...
+
+    @abstractmethod
+    def health_check(self) -> bool:
+        """Checks that the plugin server is active and healthy."""
+        ...
+
+
+class ConfigOption(BaseModel):
+    """Model for defining mapping between charm config and connector config."""
+
+    json_key: str  # Config key in the Task configuration JSON
+    default: Any  # Default value
+    configurable: bool = True  # Whether this option is configurable using charm config or not
+    description: str = ""
+
+
 class BaseConfigFormatter:
     """Object used for mapping charm config keys to connector task JSON configuration keys and/or setting default configuration values.
 
-    Mapping of charm config keys to JSON config keys is provided via class variables.
-    For example, defining `topic = "connector.config.kafka.topic"` would map the value provided by `charm.config["topic"]` to a key named `connector.config.kafka.topic` in the connector JSON config.
+    Mapping of charm config keys to JSON config keys is provided via `ConfigOption` class variables.
 
-    Default static configuration values should be provided using the `DEFAULTS` special class variable, which is mapping of config keys to their respective values.
-    Obviously, charm config would override default configuration provided in `DEFAULTS`.
+    Example: To map `topic` charm config to `connector.config.kafka.topic` in the connector JSON config, one should provide:
+
+        topic = ConfigOption(json_key="connector.config.kafka.topic", default="some-topic", description="...")
+
+    Default static configuration values should be provided by setting `configurable=False` in `ConfigOption` and providing a `default` value
 
     Note: dynamic configuration based on relation data should be done by calling BaseIntegrator.configure() method either inside hooks or during BaseIntegrator.setup().
     Dynamic config would override static config if provided.
     """
 
-    DEFAULTS: Mapping[str, Any] = {}
-
     @classmethod
     def fields(cls) -> list[str]:
         """Returns a list of non-special class variables."""
-        return [
-            v
-            for v in dir(cls)
-            if not callable(getattr(cls, v)) and not v.startswith("__") and v != "DEFAULTS"
-        ]
+        return [v for v in dir(cls) if not callable(getattr(cls, v)) and not v.startswith("__")]
 
     @classmethod
     def to_dict(cls, charm_config: ConfigData) -> dict:
         """Serializes a given charm `ConfigData` object to a Python dictionary based on predefined mappings/defaults."""
-        ret = dict(cls.DEFAULTS)
-        for k, v in charm_config.items():
-            mapped = getattr(cls, k, k)
-            ret[mapped] = v
+        ret = {}
+        for k in cls.fields():
+            option = cast(ConfigOption, getattr(cls, k))
+
+            if option.configurable and k in charm_config:
+                ret[option.json_key] = charm_config[k]
+                continue
+
+            ret[option.json_key] = option.default
+
         return ret
 
 
@@ -321,8 +362,8 @@ class BaseIntegrator(ABC, Object):
     """Basic interface for handling Kafka Connect Requirer side events and functions."""
 
     name: str
-    mode: IntegratorMode
     formatter: type[BaseConfigFormatter]
+    plugin_server: type[BasePluginServer]
 
     CONFIG_SECRET_FIELD = "config"
     CONNECT_REL = "connect-client"
@@ -332,19 +373,22 @@ class BaseIntegrator(ABC, Object):
         self,
         /,
         charm: CharmBase,
-        plugin_url: str,
+        plugin_server_args: Optional[list] = [],
+        plugin_server_kwargs: Mapping[str, Any] = {},
     ):
         super().__init__(charm, f"integrator-{self.name}")
 
-        for field in ("name", "mode", "formatter"):
+        for field in ("name", "formatter", "plugin_server"):
             if not getattr(self, field, None):
                 raise AttributeError(
                     f"{field} not defined on BaseIntegrator interface, did you forget to set the {field} class variable?"
                 )
 
         self.charm = charm
-        self.plugin_url = plugin_url
+        self.server = self.plugin_server(*plugin_server_args, **plugin_server_kwargs)
+        self.plugin_url = self.server.plugin_url
         self.config = charm.config
+        self.mode: IntegratorMode = cast(IntegratorMode, self.config["mode"])
         self.helpers: _DataInterfacesHelpers = _DataInterfacesHelpers(self.charm)
 
         # init handlers
@@ -506,7 +550,7 @@ class BaseIntegrator(ABC, Object):
 
     def _on_integration_created(self, event: IntegrationCreatedEvent) -> None:
         """Handler for `integration_created` event."""
-        if not self.ready:
+        if not self.server.health_check() or not self.ready:
             logging.debug("Integrator not ready yet, deferring integration_created event...")
             event.defer()
             return

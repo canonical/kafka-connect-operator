@@ -1,7 +1,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-name: integrator
+name: source-integrator
 description: |
   Toy charm used to test Kafka Connect requirer interface in integration tests.
 summary: |
@@ -17,13 +17,9 @@ requires:
     interface: connect_client
     optional: true
     limit: 1
-  # client interfaces 
-  source:
+  # client interface
+  data:
     interface: mysql_client
-    optional: true
-    limit: 1
-  sink:
-    interface: postgresql_client
     optional: true
     limit: 1
 
