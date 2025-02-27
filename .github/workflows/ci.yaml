@@ -49,7 +49,6 @@ jobs:
       matrix:
         path:
           - .
-          - integrator/
           - tests/integration/app-charm/
 
   integration-test:
