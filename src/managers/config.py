@@ -6,6 +6,7 @@
 
 import inspect
 import logging
+import os
 from typing import cast
 
 from core.models import Context
@@ -132,6 +133,9 @@ class ConfigManager:
     @property
     def jmx_opts(self) -> list[str]:
         """The JMX options for configuring the prometheus exporter."""
+        if not os.path.exists(self.workload.paths.jmx_prometheus_config):
+            return []
+
         return [
             f"-javaagent:{self.workload.paths.jmx_prometheus_javaagent}={JMX_EXPORTER_PORT}:{self.workload.paths.jmx_prometheus_config}",
         ]
