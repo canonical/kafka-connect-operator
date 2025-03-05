@@ -4,7 +4,6 @@
 
 """Manager for handling operations on Kafka Connect workers."""
 
-import glob
 import logging
 import os
 import re
@@ -26,7 +25,7 @@ from tenacity import (
 
 from core.models import Context
 from core.workload import WorkloadBase
-from literals import GROUP, USER
+from literals import GROUP, SUBSTRATE, USER
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +123,13 @@ class ConnectManager:
 
     def load_plugin(self, resource_path: Path, path_prefix: str = "") -> None:
         """Loads a plugin from a given `resource_path` to the `PLUGIN_PATH` folder, skips if previously loaded."""
+        if SUBSTRATE == "k8s":
+            # we should push the plugin to kafka connect container first.
+            tmp_dir = tempfile.mkdtemp()
+            tmp_path = f"{tmp_dir}/{os.path.basename(resource_path)}"
+            self.workload.write(open(resource_path, "rb"), tmp_path)
+            resource_path = Path(tmp_path)
+
         if self._plugin_checksum(resource_path) in self.plugins_cache:
             logger.debug(f"Plugin {resource_path.name} already loaded, skipping...")
             return
@@ -165,8 +171,9 @@ class ConnectManager:
 
     def remove_plugin(self, path_prefix: str) -> None:
         """Removes plugins for which the plugin-path starts with `path_prefix`."""
-        for path in glob.glob(f"{self.workload.paths.plugins}/{path_prefix}*"):
-            self.workload.exec(["rm", "-rf", path])
+        self.workload.remove(
+            f"{self.workload.paths.plugins.rstrip('/')}/{path_prefix}*", glob=True
+        )
 
     def ping_connect_api(self) -> requests.Response:
         """Makes a GET request to the unit's Connect API Endpoint and returns the response."""
