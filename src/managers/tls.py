@@ -4,7 +4,6 @@
 
 """Manager for handling Kafka TLS configuration."""
 
-import glob
 import logging
 import socket
 import subprocess
@@ -37,6 +36,7 @@ class TLSManager:
         workload: WorkloadBase,
         substrate: Substrates,
     ):
+        self.context = context
         self.unit_context: WorkerUnitContext = context.worker_unit
         self.tls_context: TLSContext = self.unit_context.tls
         self.workload = workload
@@ -172,7 +172,21 @@ class TLSManager:
                 sans_dns=[self.unit_context.unit.name, socket.getfqdn()],
             )
         else:
-            raise NotImplementedError
+            return Sans(
+                sans_ip=sorted(
+                    [
+                        str(self.context.bind_address),
+                        # self.unit_context.node_ip,
+                    ]
+                ),
+                sans_dns=sorted(
+                    [
+                        self.unit_context.internal_address.split(".")[0],
+                        self.unit_context.internal_address,
+                        socket.getfqdn(),
+                    ]
+                ),
+            )
 
     def get_current_sans(self) -> Sans | None:
         """Gets the current SANs for the unit cert."""
@@ -236,5 +250,4 @@ class TLSManager:
     def remove_stores(self) -> None:
         """Cleans up all keys/certs/stores on a unit."""
         for pattern in ["*.pem", "*.key", "*.p12", "*.jks"]:
-            for file in glob.glob(f"{self.workload.paths.config_dir}/{pattern}"):
-                self.workload.remove(file)
+            self.workload.remove(f"{self.workload.paths.config_dir}/{pattern}", glob=True)

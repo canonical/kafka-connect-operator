@@ -8,8 +8,9 @@ import re
 import secrets
 import string
 from abc import ABC, abstractmethod
-from typing import Iterable
+from typing import BinaryIO, Iterable
 
+from ops import Container
 from ops.pebble import Layer
 
 from literals import CONFIG_DIR, PLUGIN_PATH, SNAP_NAME
@@ -26,6 +27,11 @@ class Paths:
     def snap_dir(self) -> str:
         """Path to Kafka & Kafka connect snap's base dir."""
         return f"/snap/{SNAP_NAME}/current/opt/kafka"
+
+    @property
+    def logs_dir(self) -> str:
+        """Path to logs dir."""
+        return f"/var/snap/{SNAP_NAME}/common/var/log/connect"
 
     @property
     def env(self) -> str:
@@ -77,6 +83,7 @@ class WorkloadBase(ABC):
     """Base interface for common workload operations."""
 
     paths: Paths = Paths(config_dir=CONFIG_DIR)
+    container: Container
 
     @abstractmethod
     def start(self) -> None:
@@ -106,7 +113,7 @@ class WorkloadBase(ABC):
         ...
 
     @abstractmethod
-    def write(self, content: str, path: str, mode: str = "w") -> None:
+    def write(self, content: str | BinaryIO, path: str, mode: str = "w") -> None:
         """Writes content to a workload file.
 
         Args:
@@ -158,7 +165,7 @@ class WorkloadBase(ABC):
         ...
 
     @abstractmethod
-    def remove(self, path: str):
+    def remove(self, path: str, glob: bool = False):
         """Removes the file at the provided path."""
         ...
 

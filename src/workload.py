@@ -4,15 +4,16 @@
 
 """Kafka Connect workload class and methods."""
 
+import glob as _glob
 import logging
 import os
 import socket
 import subprocess
 from contextlib import closing
-from typing import Iterable, Mapping
+from typing import BinaryIO, Iterable, Mapping
 
 from charms.operator_libs_linux.v2 import snap
-from ops import Container, pebble
+from ops import pebble
 from tenacity import retry, retry_if_result, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
@@ -34,8 +35,7 @@ class Workload(WorkloadBase):
 
     service: str
 
-    def __init__(self, container: Container | None = None) -> None:
-        self.container = container
+    def __init__(self) -> None:
         self.kafka = snap.SnapCache()[SNAP_NAME]
         self.service = SERVICE_NAME
 
@@ -71,7 +71,7 @@ class Workload(WorkloadBase):
         return content
 
     @override
-    def write(self, content: str, path: str, mode: str = "w") -> None:
+    def write(self, content: str | BinaryIO, path: str, mode: str = "w") -> None:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, mode) as f:
             f.write(content)
@@ -149,8 +149,13 @@ class Workload(WorkloadBase):
         self.exec(["rm", "-r", path])
 
     @override
-    def remove(self, path: str):
-        self.exec(["rm", path])
+    def remove(self, path: str, glob: bool = False):
+        if not glob:
+            self.exec(["rm", path])
+            return
+
+        for file in _glob.glob(path):
+            self.exec(["rm", file])
 
     @override
     def check_socket(self, host: str, port: int) -> bool:
