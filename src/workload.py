@@ -155,7 +155,7 @@ class Workload(WorkloadBase):
             return
 
         for file in _glob.glob(path):
-            self.exec(["rm", file])
+            self.exec(["rm", "-rf", file])
 
     @override
     def check_socket(self, host: str, port: int) -> bool:
