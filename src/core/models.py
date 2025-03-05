@@ -498,6 +498,17 @@ class Context(WithStatus, Object):
         )
 
     @property
+    def bind_address(self) -> str:
+        """The network binding address from the peer relation."""
+        bind_address = ""
+
+        if self.peer_relation:
+            if binding := self.model.get_binding(self.peer_relation):
+                bind_address = binding.network.bind_address
+
+        return str(bind_address)
+
+    @property
     def clients(self) -> dict[int, ConnectClientContext]:
         """Returns a mapping of integrator relation-id to the related client context."""
         clients = {}

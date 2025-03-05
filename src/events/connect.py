@@ -47,6 +47,7 @@ class ConnectHandler(Object):
         """Handler for `update-status` event."""
         if self.charm.connect_manager.health_check():
             self.charm._set_status(Status.ACTIVE)
+            self.charm.unit.set_ports(self.context.rest_port)
         elif self.context.ready:
             self.charm._set_status(Status.SERVICE_NOT_RUNNING)
         else:
@@ -63,7 +64,6 @@ class ConnectHandler(Object):
         if not self.charm.connect_manager.plugin_path_initiated:
             self.charm.connect_manager.init_plugin_path()
 
-        resource_path = None
         try:
             resource_path = self.model.resources.fetch(PLUGIN_RESOURCE_KEY)
             self.charm.connect_manager.load_plugin(resource_path)
@@ -91,7 +91,7 @@ class ConnectHandler(Object):
         current_config = set(self.charm.workload.read(self.workload.paths.worker_properties))
         diff = set(self.charm.config_manager.properties) ^ current_config
 
-        if not any([diff, resource_path, self.context.worker_unit.should_restart]):
+        if not any([diff, self.context.worker_unit.should_restart]):
             return
 
         if not self.context.ready:
