@@ -10,7 +10,6 @@ import string
 from abc import ABC, abstractmethod
 from typing import BinaryIO, Iterable
 
-from ops import Container
 from ops.pebble import Layer
 
 from literals import CONFIG_DIR, PLUGIN_PATH, SNAP_NAME
@@ -83,7 +82,6 @@ class WorkloadBase(ABC):
     """Base interface for common workload operations."""
 
     paths: Paths = Paths(config_dir=CONFIG_DIR)
-    container: Container
 
     @abstractmethod
     def start(self) -> None:
