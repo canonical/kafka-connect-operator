@@ -34,6 +34,9 @@ KAFKA_APP = "kafka"
 KAFKA_CHANNEL = "3/edge"
 MYSQL_APP = "mysql"
 MYSQL_CHANNEL = "8.0/stable"
+POSTGRES_APP = "postgresql"
+POSTGRES_CHANNEL = "14/stable"
+
 
 JDBC_CONNECTOR_DOWNLOAD_LINK = "https://github.com/Aiven-Open/jdbc-connector-for-apache-kafka/releases/download/v6.10.0/jdbc-connector-for-apache-kafka-6.10.0.tar"
 JDBC_SOURCE_CONNECTOR_CLASS = "io.aiven.connect.jdbc.JdbcSourceConnector"
@@ -48,6 +51,16 @@ class CommandResult:
     return_code: int | None
     stdout: str
     stderr: str
+
+
+@dataclass
+class DatabaseFixtureParams:
+    """Data model for database test data fixture requests."""
+
+    app_name: str
+    db_name: str
+    no_tables: int = 1
+    no_records: int = 1000
 
 
 def check_socket(host: str | None, port: int) -> bool:
