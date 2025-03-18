@@ -4,7 +4,10 @@ from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
-from charms.data_platform_libs.v0.data_interfaces import IntegrationRequestedEvent
+from charms.data_platform_libs.v0.data_interfaces import (
+    PLUGIN_URL_NOT_REQUIRED,
+    IntegrationRequestedEvent,
+)
 from ops.testing import Context, PeerRelation, Relation, Secret, State
 from src.charm import ConnectCharm
 from src.literals import CLIENT_REL, PEER_REL, Status
@@ -12,7 +15,14 @@ from src.literals import CLIENT_REL, PEER_REL, Status
 logger = logging.getLogger(__name__)
 
 
-def test_integration_requested(ctx: Context, base_state: State, active_service: MagicMock) -> None:
+@pytest.mark.parametrize(
+    "plugin_url",
+    [PLUGIN_URL_NOT_REQUIRED, "mellon"],
+    ids=[f"plugin_url {PLUGIN_URL_NOT_REQUIRED}", "pugin_url"],
+)
+def test_integration_requested(
+    ctx: Context, base_state: State, active_service: MagicMock, plugin_url
+) -> None:
     """Checks the `integration_requested` event triggers creation of credentials on the provider side."""
     # Given
     relation_id = 7
@@ -21,7 +31,7 @@ def test_integration_requested(ctx: Context, base_state: State, active_service: 
         CLIENT_REL,
         CLIENT_REL,
         id=relation_id,
-        remote_app_data={"plugin-url": "http://10.10.10.10:8080"},
+        remote_app_data={"plugin-url": plugin_url},
     )
     peer_rel = PeerRelation(PEER_REL, PEER_REL)
     event = IntegrationRequestedEvent(
@@ -33,7 +43,7 @@ def test_integration_requested(ctx: Context, base_state: State, active_service: 
     state_in = dataclasses.replace(base_state, relations=[peer_rel, client_rel])
 
     # When
-    with ctx(ctx.on.update_status(), state_in) as mgr:
+    with (ctx(ctx.on.update_status(), state_in) as mgr,):
         charm = cast(ConnectCharm, mgr.charm)
         charm.connect_manager = connect_manager_mock
         charm.auth_manager = auth_manager_mock
@@ -41,7 +51,12 @@ def test_integration_requested(ctx: Context, base_state: State, active_service: 
         charm.connect.provider._on_integration_requested(event)
         state_out = mgr.run()
 
-    # Then
+        # Then
+        if plugin_url == PLUGIN_URL_NOT_REQUIRED:
+            assert not charm.connect_manager.load_plugin_from_url.call_count
+        else:
+            assert charm.connect_manager.load_plugin_from_url.call_count
+
     assert client_rel.local_app_data.get("username") == f"relation-{relation_id}"
     assert client_rel.local_app_data.get("password")
     assert peer_rel.local_unit_data.get("restart") == "true"
