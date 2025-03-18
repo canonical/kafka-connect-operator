@@ -8,6 +8,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from charms.data_platform_libs.v0.data_interfaces import (
+    PLUGIN_URL_NOT_REQUIRED,
     IntegrationRequestedEvent,
     KafkaConnectProviderEventHandlers,
 )
@@ -59,17 +60,14 @@ class ConnectProvider(Object):
             event.defer()
             return
 
-        if not client.plugin_url:
-            event.defer()
-            return
-
-        try:
-            self.charm.connect_manager.load_plugin_from_url(
-                client.plugin_url, path_prefix=client.username
-            )
-        except PluginDownloadFailedError as e:
-            logger.error(f"Unable to fetch the plugin: {e}")
-            return
+        if client.plugin_url != PLUGIN_URL_NOT_REQUIRED:
+            try:
+                self.charm.connect_manager.load_plugin_from_url(
+                    client.plugin_url, path_prefix=client.username
+                )
+            except PluginDownloadFailedError as e:
+                logger.error(f"Unable to fetch the plugin: {e}")
+                return
 
         if not self.charm.unit.is_leader():
             return

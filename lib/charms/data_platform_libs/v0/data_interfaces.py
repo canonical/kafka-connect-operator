@@ -301,6 +301,7 @@ from enum import Enum
 from typing import (
     Callable,
     Dict,
+    Final,
     ItemsView,
     KeysView,
     List,
@@ -3599,6 +3600,8 @@ class KafkaConnectProvides(KafkaConnectProviderData, KafkaConnectProviderEventHa
         KafkaConnectProviderData.__init__(self, charm.model, relation_name)
         KafkaConnectProviderEventHandlers.__init__(self, charm, self)
 
+# Sentinel value passed from Kafka Connect requirer side when it does not need to serve any plugins.
+PLUGIN_URL_NOT_REQUIRED: Final[str] = "NOT-REQUIRED"
 
 class KafkaConnectRequirerData(RequirerData):
     """Requirer-side of the Kafka Connect relation."""
