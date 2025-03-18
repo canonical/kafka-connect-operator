@@ -4,7 +4,7 @@
 
 from collections import defaultdict
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import yaml
@@ -86,7 +86,13 @@ def plugin_resource():
 
 @pytest.fixture(scope="module")
 def active_service():
-    with patch(
-        "managers.connect.ConnectManager.health_check", return_value=True
-    ) as patched_service:
+    mock_response = MagicMock()
+    mock_response.json.return_value = {}
+
+    with (
+        patch(
+            "managers.connect.ConnectManager.health_check", return_value=True
+        ) as patched_service,
+        patch("managers.connect.ConnectManager._request", return_value=mock_response),
+    ):
         yield patched_service
