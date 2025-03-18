@@ -459,7 +459,7 @@ class BaseIntegrator(ABC, Object):
     def _peer_relation(self) -> Optional[Relation]:
         """Peer `Relation` object."""
         return self.model.get_relation(self.PEER_REL)
-    
+
     @property
     def _connect_client_relation(self) -> Optional[Relation]:
         """connect-client `Relation` object."""
@@ -500,7 +500,7 @@ class BaseIntegrator(ABC, Object):
         """Returns connectors' unique name used on the REST interface."""
         if not self._connect_client_relation:
             return ""
-        
+
         relation_id = self._connect_client_relation.id
         return f"{self.name}_r{relation_id}_{self.model.uuid.replace('-', '')}"
 
