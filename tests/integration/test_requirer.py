@@ -13,6 +13,7 @@ from helpers import (
     POSTGRES_APP,
     POSTGRES_CHANNEL,
     DatabaseFixtureParams,
+    assert_connector_statuses,
     download_file,
     get_unit_ipv4_address,
     run_command_on_unit,
@@ -206,3 +207,29 @@ async def test_relate_with_connect_starts_sink_integrator(ops_test: OpsTest):
     logger.info("Checking number of records in sink Postgres DB (should be 20):")
     print(res.stdout)
     assert "20" in res.stdout
+
+
+@pytest.mark.abort_on_fail
+async def test_relation_broken(ops_test: OpsTest):
+    """Checks `relation-broken` stops the connectors."""
+    await assert_connector_statuses(ops_test, running=2)
+
+    await ops_test.juju("remove-relation", APP_NAME, POSTGRES_INTEGRATOR)
+    async with ops_test.fast_forward(fast_interval="30s"):
+        await ops_test.model.wait_for_idle(
+            apps=[APP_NAME, POSTGRES_INTEGRATOR], idle_period=60, timeout=600
+        )
+
+    await assert_connector_statuses(ops_test, running=1, stopped=1)
+
+    # relate again with connect
+    await ops_test.model.add_relation(APP_NAME, POSTGRES_INTEGRATOR)
+    async with ops_test.fast_forward(fast_interval="30s"):
+        await ops_test.model.wait_for_idle(
+            apps=[APP_NAME, POSTGRES_INTEGRATOR], idle_period=30, timeout=600
+        )
+        await asyncio.sleep(120)
+
+    # new connector should show up in RUNNING state,
+    # while previous connector should be in STOPPED state.
+    await assert_connector_statuses(ops_test, running=2, stopped=1)

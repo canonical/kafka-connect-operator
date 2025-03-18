@@ -39,6 +39,7 @@ PLUGIN_PATH = f"/var/snap/{SNAP_NAME}/common/var/lib/connect/plugins/"
 CONFIG_DIR = f"/var/snap/{SNAP_NAME}/current/etc/connect"
 JMX_EXPORTER_PORT = 9100
 METRICS_RULES_DIR = "./src/alert_rules/prometheus"
+EMPTY_PLUGIN_CHECKSUM = "84ff92691f909a05b224e1c56abb4864f01b4f8e3c854e4bb4c7baf1d3f6d652"
 
 TOPICS = {"offset": "connect-offset", "config": "connect-config", "status": "connect-status"}
 REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor

@@ -49,6 +49,7 @@ class ConnectHandler(Object):
         if self.charm.connect_manager.health_check():
             self.charm._set_status(Status.ACTIVE)
             self.charm.unit.set_ports(self.context.rest_port)
+            logger.info(f"Connector(s) Status: {self.charm.connect_manager.connectors}")
         elif self.context.ready:
             self.charm._set_status(Status.SERVICE_NOT_RUNNING)
         else:
