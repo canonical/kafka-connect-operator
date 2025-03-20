@@ -41,6 +41,9 @@ LIBAPI = 0
 LIBPATCH = 1
 
 
+YAML_TYPE_MAPPER = {str: "string", int: "int", bool: "boolean"}
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -148,10 +151,26 @@ class BasePluginServer(ABC):
 
 
 class ConfigOption(BaseModel):
-    """Model for defining mapping between charm config and connector config."""
+    """Model for defining mapping between charm config and connector config.
+
+    To define a config mapping, following properties could be used:
+
+        json_key (str, required): The counterpart key in connector JSON config. If `mode` is set to "none", this would be ignored and could be set to any arbitrary value.
+        default (Any, required): The default value for this config option.
+        mode (Literal["both", "source", "sink", "none"], optional): Defaults to "both". The expected behaviour of each mode are as following:
+            - both: This config option would be used in both source and sink connector modes.
+            - source: This config option would be used ONLY in source connector mode.
+            - sink: This config option would be used ONLY in sink connector mode.
+            - none: This is not a connector config, but rather a charm config. If set to none, this option would not be used to configure the connector.
+        configurable (bool, optional): Whether this option is configurable via charm config. Defaults to True.
+        description (str, optional): A brief description of this config option, which will be added to the charm's `config.yaml`.
+    """
 
     json_key: str  # Config key in the Task configuration JSON
     default: Any  # Default value
+    mode: Literal[
+        "both", "source", "sink", "none"
+    ] = "both"  # Whether this is a generic config or source/sink-only.
     configurable: bool = True  # Whether this option is configurable using charm config or not
     description: str = ""
 
@@ -171,17 +190,32 @@ class BaseConfigFormatter:
     Dynamic config would override static config if provided.
     """
 
+    mode = ConfigOption(
+        json_key="na",
+        default="source",
+        description='Integrator mode, either "source" or "sink"',
+        mode="none",
+    )
+
     @classmethod
     def fields(cls) -> list[str]:
         """Returns a list of non-special class variables."""
         return [v for v in dir(cls) if not callable(getattr(cls, v)) and not v.startswith("__")]
 
     @classmethod
-    def to_dict(cls, charm_config: ConfigData) -> dict:
+    def to_dict(cls, charm_config: ConfigData, mode: IntegratorMode) -> dict:
         """Serializes a given charm `ConfigData` object to a Python dictionary based on predefined mappings/defaults."""
         ret = {}
         for k in cls.fields():
             option = cast(ConfigOption, getattr(cls, k))
+
+            if option.mode == "none":
+                # This is not a task config option
+                continue
+
+            if option.mode != "both" and option.mode != mode:
+                # Source/sink-only config, skip
+                continue
 
             if option.configurable and k in charm_config:
                 ret[option.json_key] = charm_config[k]
@@ -190,6 +224,35 @@ class BaseConfigFormatter:
             ret[option.json_key] = option.default
 
         return ret
+
+    @classmethod
+    def to_config_yaml(cls) -> dict[str, Any]:
+        """Returns a dict compatible with charmcraft `config.yaml` format."""
+        config = {"options": {}}
+        options = config["options"]
+
+        for _attr in dir(cls):
+
+            if _attr.startswith("__"):
+                continue
+
+            attr = getattr(cls, _attr)
+
+            if isinstance(attr, ConfigOption):
+                option = cast(ConfigOption, attr)
+
+                if not option.configurable:
+                    continue
+
+                options[_attr] = {
+                    "default": option.default,
+                    "type": YAML_TYPE_MAPPER.get(type(option.default), "string"),
+                }
+
+                if option.description:
+                    options[_attr]["description"] = option.description
+
+        return config
 
 
 class ConnectClient:
@@ -242,7 +305,8 @@ class ConnectClient:
         auth = HTTPBasicAuth(self.client_context.username, self.client_context.password)
 
         try:
-            response = requests.request(method, url, auth=auth, **kwargs)
+            # TODO: FIXME: use tls-ca to verify the cert.
+            response = requests.request(method, url, verify=False, auth=auth, **kwargs)
         except Exception as e:
             raise ConnectApiError(f"Connect API call /{api} failed: {e}")
 
@@ -251,7 +315,7 @@ class ConnectClient:
 
         return response
 
-    def start_task(self, task_config: dict) -> None:
+    def start_connector(self, task_config: dict) -> None:
         """Starts a connector task by posting `task_config` to the `connectors` endpoint.
 
         Raises:
@@ -264,13 +328,13 @@ class ConnectClient:
             return
 
         if response.status_code == 409 and "already exists" in response.json().get("message", ""):
-            logger.info("Task has already been submitted, skipping...")
+            logger.info("Connector has already been submitted, skipping...")
             return
 
         logger.error(response.content)
-        raise ConnectApiError(f"Unable to start the task, details: {response.content}")
+        raise ConnectApiError(f"Unable to start the connector, details: {response.content}")
 
-    def stop_task(self) -> None:
+    def stop_connector(self) -> None:
         """Stops a connector by making a request to connectors/CONNECTOR-NAME/stop endpoint.
 
         Raises:
@@ -279,7 +343,7 @@ class ConnectClient:
         response = self.request(method="PUT", api=f"connectors/{self.connector_name}/stop")
 
         if response.status_code != 204:
-            raise ConnectApiError(f"Unable to stop the task, details: {response.content}")
+            raise ConnectApiError(f"Unable to stop the connector, details: {response.content}")
 
     def task_status(self) -> TaskStatus:
         """Returns the connector/task status."""
@@ -364,6 +428,7 @@ class BaseIntegrator(ABC, Object):
     name: str
     formatter: type[BaseConfigFormatter]
     plugin_server: type[BasePluginServer]
+    mode: IntegratorMode = "source"
 
     CONFIG_SECRET_FIELD = "config"
     CONNECT_REL = "connect-client"
@@ -388,7 +453,7 @@ class BaseIntegrator(ABC, Object):
         self.server = self.plugin_server(*plugin_server_args, **plugin_server_kwargs)
         self.plugin_url = self.server.plugin_url
         self.config = charm.config
-        self.mode: IntegratorMode = cast(IntegratorMode, self.config["mode"])
+        self.mode: IntegratorMode = cast(IntegratorMode, self.config.get("mode", self.mode))
         self.helpers: _DataInterfacesHelpers = _DataInterfacesHelpers(self.charm)
 
         # init handlers
@@ -408,6 +473,11 @@ class BaseIntegrator(ABC, Object):
     def _peer_relation(self) -> Optional[Relation]:
         """Peer `Relation` object."""
         return self.model.get_relation(self.PEER_REL)
+
+    @property
+    def _connect_client_relation(self) -> Optional[Relation]:
+        """connect-client `Relation` object."""
+        return self.model.get_relation(self.CONNECT_REL)
 
     @cached_property
     def _requirer_interface(self) -> KafkaConnectRequirerData:
@@ -435,9 +505,18 @@ class BaseIntegrator(ABC, Object):
     @cached_property
     def _client(self) -> ConnectClient:
         """Kafka Connect client for handling REST API calls."""
-        return ConnectClient(self._client_context, self.name)
+        return ConnectClient(self._client_context, self.connector_unique_name)
 
     # Public properties
+
+    @property
+    def connector_unique_name(self) -> str:
+        """Returns connectors' unique name used on the REST interface."""
+        if not self._connect_client_relation:
+            return ""
+
+        relation_id = self._connect_client_relation.id
+        return f"{self.name}_r{relation_id}_{self.model.uuid.replace('-', '')}"
 
     @property
     def started(self) -> bool:
@@ -493,7 +572,7 @@ class BaseIntegrator(ABC, Object):
             self._peer_relation.id, data={self.CONFIG_SECRET_FIELD: json.dumps(updated_config)}
         )
 
-    def start_task(self) -> None:
+    def start_connector(self) -> None:
         """Starts the connector task."""
         if self.started:
             logger.info("Connector task has already started")
@@ -502,23 +581,14 @@ class BaseIntegrator(ABC, Object):
         self.setup()
 
         try:
-            self._client.start_task(self.formatter.to_dict(self.config) | self.dynamic_config)
+            self._client.start_connector(
+                self.formatter.to_dict(self.config, self.mode) | self.dynamic_config
+            )
         except ConnectApiError as e:
-            logger.error(f"Task start failed, details: {e}")
+            logger.error(f"Unable to start the connector, details: {e}")
             return
 
         self.started = True
-
-    def stop_task(self) -> None:
-        """Stops the connector task."""
-        try:
-            self._client.stop_task()
-        except ConnectApiError as e:
-            logger.error(f"Task stop failed, details: {e}")
-            return
-
-        self.teardown()
-        self.started = False
 
     @property
     def task_status(self) -> TaskStatus:
@@ -556,7 +626,7 @@ class BaseIntegrator(ABC, Object):
             return
 
         logger.info(f"Starting {self.name} task...")
-        self.start_task()
+        self.start_connector()
 
         if not self.started:
             event.defer()
@@ -567,4 +637,5 @@ class BaseIntegrator(ABC, Object):
 
     def _on_relation_broken(self, _: RelationBrokenEvent) -> None:
         """Handler for `relation-broken` event."""
-        self.stop_task()
+        self.teardown()
+        self.started = False
