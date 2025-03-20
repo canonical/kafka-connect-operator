@@ -8,6 +8,7 @@ import datetime
 import logging
 from typing import TYPE_CHECKING
 
+from charms.data_platform_libs.v0.data_interfaces import PLUGIN_URL_NOT_REQUIRED
 from ops import ModelError
 from ops.charm import (
     ConfigChangedEvent,
@@ -131,7 +132,10 @@ class ConnectHandler(Object):
                 )
                 continue
 
-            if client.username not in loaded_plugins:
+            if (
+                client.username not in loaded_plugins
+                and client.plugin_url != PLUGIN_URL_NOT_REQUIRED
+            ):
                 continue
 
             if set(client.endpoints.split(",")) == set(self.context.rest_endpoints.split(",")):
@@ -155,7 +159,7 @@ class ConnectHandler(Object):
         update_set = set()
 
         for client in self.context.clients.values():
-            if client.username in loaded_clients:
+            if client.username in loaded_clients or client.plugin_url == PLUGIN_URL_NOT_REQUIRED:
                 continue
 
             try:
