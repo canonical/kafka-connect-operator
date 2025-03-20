@@ -151,7 +151,20 @@ class BasePluginServer(ABC):
 
 
 class ConfigOption(BaseModel):
-    """Model for defining mapping between charm config and connector config."""
+    """Model for defining mapping between charm config and connector config.
+
+    To define a config mapping, following properties could be used:
+
+        json_key (str, required): The counterpart key in connector JSON config. If `mode` is set to "none", this would be ignored and could be set to any arbitrary value.
+        default (Any, required): The default value for this config option.
+        mode (Literal["both", "source", "sink", "none"], optional): Defaults to "both". The expected behaviour of each mode are as following:
+            - both: This config option would be used in both source and sink connector modes.
+            - source: This config option would be used ONLY in source connector mode.
+            - sink: This config option would be used ONLY in sink connector mode.
+            - none: This is not a connector config, but rather a charm config. If set to none, this option would not be used to configure the connector.
+        configurable (bool, optional): Whether this option is configurable via charm config. Defaults to True.
+        description (str, optional): A brief description of this config option, which will be added to the charm's `config.yaml`.
+    """
 
     json_key: str  # Config key in the Task configuration JSON
     default: Any  # Default value
@@ -292,6 +305,7 @@ class ConnectClient:
         auth = HTTPBasicAuth(self.client_context.username, self.client_context.password)
 
         try:
+            # TODO: FIXME: use tls-ca to verify the cert.
             response = requests.request(method, url, verify=False, auth=auth, **kwargs)
         except Exception as e:
             raise ConnectApiError(f"Connect API call /{api} failed: {e}")
