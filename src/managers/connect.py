@@ -56,7 +56,7 @@ class ConnectManager:
     @property
     def plugin_path_initiated(self) -> bool:
         """Checks whether plugin path is initiated or not."""
-        return os.path.exists(self.workload.paths.plugins)
+        return self.workload.dir_exists(self.workload.paths.plugins)
 
     @property
     def loaded_client_plugins(self) -> set:
@@ -115,8 +115,8 @@ class ConnectManager:
         try:
             self._plugins_cache = {
                 f.name
-                for f in os.scandir(self.workload.paths.plugins)
-                if f.is_dir() and not f.name.startswith(".")
+                for f in self.workload.ls(self.workload.paths.plugins)
+                if f.is_dir and not f.name.startswith(".")
             }
         except FileNotFoundError:  # possibly since plugins folder not created yet.
             return
