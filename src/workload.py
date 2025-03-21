@@ -17,7 +17,7 @@ from ops import pebble
 from tenacity import retry, retry_if_result, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
-from core.workload import WorkloadBase
+from core.workload import DirEntry, WorkloadBase
 from literals import (
     CHARMED_KAFKA_SNAP_REVISION,
     GROUP,
@@ -141,21 +141,29 @@ class Workload(WorkloadBase):
         return self.exec(command)
 
     @override
-    def mkdir(self, path: str):
+    def mkdir(self, path: str) -> None:
         self.exec(["mkdir", path])
 
     @override
-    def rmdir(self, path: str):
+    def rmdir(self, path: str) -> None:
         self.exec(["rm", "-r", path])
 
     @override
-    def remove(self, path: str, glob: bool = False):
+    def remove(self, path: str, glob: bool = False) -> None:
         if not glob:
             self.exec(["rm", path])
             return
 
         for file in _glob.glob(path):
             self.exec(["rm", "-rf", file])
+
+    @override
+    def dir_exists(self, path: str) -> bool:
+        return os.path.exists(path)
+
+    @override
+    def ls(self, path: str) -> list[DirEntry]:
+        return [DirEntry(name=f.name, is_dir=f.is_dir()) for f in os.scandir(path)]
 
     @override
     def check_socket(self, host: str, port: int) -> bool:

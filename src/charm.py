@@ -4,6 +4,7 @@
 
 """Charmed Machine Operator for Apache Kafka Connect."""
 
+import datetime
 import logging
 
 import ops
@@ -11,6 +12,7 @@ from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from ops import (
     CollectStatusEvent,
+    ModelError,
     StatusBase,
 )
 
@@ -25,6 +27,7 @@ from literals import (
     DEPENDENCIES,
     JMX_EXPORTER_PORT,
     METRICS_RULES_DIR,
+    PLUGIN_RESOURCE_KEY,
     SNAP_NAME,
     SUBSTRATE,
     DebugLevel,
@@ -117,6 +120,55 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         workload_status = Status.INSTALLING if not self.workload.installed else self.context.status
         for status in self.pending_inactive_statuses + [workload_status]:
             event.add_status(status.value.status)
+
+    def reconcile(self) -> None:
+        """Substrate-agnostic method for startup/restarts/config-changes which orchestrates workload, managers and handlers.
+
+        This method is safe to call and only triggers a workload restart if necessary.
+        """
+        if not self.connect_manager.plugin_path_initiated:
+            self.connect_manager.init_plugin_path()
+
+        try:
+            resource_path = self.model.resources.fetch(PLUGIN_RESOURCE_KEY)
+            self.connect_manager.load_plugin(resource_path)
+        except RuntimeError:
+            logger.error(f"Resource {PLUGIN_RESOURCE_KEY} not defined in the charm build.")
+        except (NameError, ModelError):
+            logger.debug(
+                f"Resource {PLUGIN_RESOURCE_KEY} not found or could not be downloaded, skipping plugin loading."
+            )
+
+        self.connect.update_plugins()
+        self.connect.update_clients_data()
+
+        # Check if SANs have changed.
+        if self.context.peer_workers.tls_enabled and self.tls_manager.sans_change_detected:
+            unit_tls_context = self.context.worker_unit.tls
+            self.tls.certificates.on.certificate_expiring.emit(
+                certificate=unit_tls_context.certificate,
+                expiry=datetime.datetime.now().isoformat(),
+            )
+            self.context.worker_unit.update(
+                {unit_tls_context.CERT: ""}
+            )  # ensures only single requested new certs, will be replaced on new certificate-available event
+
+            return  # config-changed would be eventually fired on certificate-available, so no need to defer.
+
+        current_config = set(self.workload.read(self.workload.paths.worker_properties))
+        diff = set(self.config_manager.properties) ^ current_config
+
+        if not any([diff, self.context.worker_unit.should_restart]):
+            return
+
+        if not self.context.ready:
+            self._set_status(self.context.status)
+            return
+
+        self.connect.enable_auth()
+        self.tls_manager.configure()
+        self.config_manager.configure()
+        self.connect_manager.restart_worker()
 
 
 if __name__ == "__main__":

@@ -47,6 +47,18 @@ class TLSManager:
         """Returns the `keytool` utility depending on substrate."""
         return f"{SNAP_NAME}.keytool" if self.substrate == "vm" else "keytool"
 
+    @property
+    def ready(self) -> bool:
+        """Checks if all TLS-related context props are set and TLS manager is ready to function."""
+        return all(
+            [
+                self.context.peer_workers.tls_enabled,
+                self.tls_context.certificate,
+                self.tls_context.ca,
+                self.tls_context.private_key,
+            ]
+        )
+
     def generate_alias(self, app_name: str, relation_id: int) -> str:
         """Generate an alias from a relation. Used to identify ca certs."""
         return f"{app_name}-{relation_id}"
@@ -222,6 +234,9 @@ class TLSManager:
     @property
     def sans_change_detected(self) -> bool:
         """Checks whether SANs has changed or not based on a comparison of TLS context with the last state available to the manager."""
+        if not self.ready:
+            return False
+
         current_sans = self.get_current_sans()
         expected_sans = self.build_sans()
 
@@ -251,3 +266,16 @@ class TLSManager:
         """Cleans up all keys/certs/stores on a unit."""
         for pattern in ["*.pem", "*.key", "*.p12", "*.jks"]:
             self.workload.remove(f"{self.workload.paths.config_dir}/{pattern}", glob=True)
+
+    def configure(self) -> None:
+        """Writes all necessary files and makes all required configuration for TLS manager."""
+        if not self.ready:
+            return
+
+        self.set_server_key()
+        self.set_ca()
+        self.set_certificate()
+        self.set_chain()
+        self.set_bundle()
+        self.set_truststore()
+        self.set_keystore()
