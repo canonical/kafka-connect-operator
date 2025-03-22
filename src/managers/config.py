@@ -14,13 +14,11 @@ from core.structured_config import CharmConfig
 from core.workload import WorkloadBase
 from literals import (
     DEFAULT_AUTH_CLASS,
-    DEFAULT_CONVERTER_CLASS,
     GROUP_ID,
     JMX_EXPORTER_PORT,
     REPLICATION_FACTOR,
     TOPICS,
     ClientModes,
-    Converters,
     InternalTopics,
 )
 
@@ -28,9 +26,21 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_OPTIONS = """
 offset.flush.interval.ms=10000
+heartbeat.interval.ms=3000
+rebalance.timeout.ms=60000
+session.timeout.ms=10000
+ssl.enabled.protocols=TLSv1.3
+ssl.protocol=TLSv1.3
+worker.sync.timeout.ms=3000
+worker.unsync.backoff.ms=300000
 key.converter.schemas.enable=false
 value.converter.schemas.enable=false
 """
+
+PROPERTIES_BLACKLIST = [
+    "profile",
+    "rest_port",
+]
 
 
 class ConfigManager:
@@ -52,12 +62,6 @@ class ConfigManager:
         self.config = config
         self.current_version = current_version
 
-    def _add_converter(
-        self, converter_mode: Converters, converter_class: str = DEFAULT_CONVERTER_CLASS
-    ) -> str:
-        """Returns key=value configuration entry for a given converter."""
-        return f"{converter_mode}.converter={converter_class}"
-
     def _add_topic(
         self, mode: str, topic_name: InternalTopics, replication_factor: int = -1
     ) -> list[str]:
@@ -77,6 +81,15 @@ class ConfigManager:
             f'{prefix_}sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{username}" password="{password}";',
         ]
 
+    @staticmethod
+    def translate_config_key(key: str):
+        """Format config names into properties.
+
+        Returns:
+            String with Kafka configuration name to be placed in the server.properties file
+        """
+        return key.replace("_", ".") if key not in PROPERTIES_BLACKLIST else f"# {key}"
+
     def save_jaas_config(self) -> None:
         """Writes JAAS configuration to `JAAS_PATH`."""
         if not self.jaas_config:
@@ -95,14 +108,6 @@ class ConfigManager:
         self.workload.set_environment(env_vars=[self.kafka_opts])
         self.save_jaas_config()
         self.save_properties()
-
-    @property
-    def converter_properties(self) -> list[str]:
-        """Returns the list of configuration for all converters."""
-        properties = []
-        for converter in ("key", "value"):
-            properties.append(self._add_converter(converter_mode=converter))
-        return properties
 
     @property
     def topic_properties(self) -> list[str]:
@@ -202,6 +207,15 @@ class ConfigManager:
         ]
 
     @property
+    def charm_config_properties(self) -> list[str]:
+        """Returns a list of properties populated from charm config."""
+        return [
+            f"{self.translate_config_key(conf_key)}={str(value)}"
+            for conf_key, value in self.config.dict().items()
+            if value is not None
+        ]
+
+    @property
     def properties(self) -> list[str]:
         """Returns all properties necessary for starting Kafka Connect service."""
         properties = (
@@ -216,8 +230,8 @@ class ConfigManager:
             + self.rest_auth_properties
             + self.client_auth_properties
             + self.client_tls_properties
-            + self.converter_properties
             + self.topic_properties
+            + self.charm_config_properties
         )
 
         return properties
