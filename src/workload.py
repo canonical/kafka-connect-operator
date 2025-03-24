@@ -161,7 +161,7 @@ class Workload(WorkloadBase):
 
     @override
     def dir_exists(self, path: str) -> bool:
-        return os.path.exists(path)
+        return os.path.isdir(path)
 
     @override
     def ls(self, path: str) -> list[DirEntry]:
