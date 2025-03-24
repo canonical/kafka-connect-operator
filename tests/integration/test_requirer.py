@@ -36,7 +36,12 @@ logger = logging.getLogger(__name__)
 async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
     """Deploys a basic test setup with Kafka, Kafka Connect, MySQL, and PostgreSQL."""
     await asyncio.gather(
-        ops_test.model.deploy(kafka_connect_charm, application_name=APP_NAME, series="jammy"),
+        ops_test.model.deploy(
+            kafka_connect_charm,
+            application_name=APP_NAME,
+            series="jammy",
+            config={"profile": "testing"},
+        ),
         ops_test.model.deploy(
             KAFKA_APP,
             channel=KAFKA_CHANNEL,

@@ -31,7 +31,12 @@ async def test_deploy_tls(ops_test: OpsTest, kafka_connect_charm):
         ops_test.model.deploy(
             TLS_APP, channel="stable", config=TLS_CONFIG, series="jammy", revision=155
         ),
-        ops_test.model.deploy(kafka_connect_charm, application_name=APP_NAME, series="jammy"),
+        ops_test.model.deploy(
+            kafka_connect_charm,
+            application_name=APP_NAME,
+            series="jammy",
+            config={"profile": "testing"},
+        ),
         ops_test.model.deploy(
             KAFKA_APP,
             channel=KAFKA_CHANNEL,
