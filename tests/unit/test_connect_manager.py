@@ -24,7 +24,7 @@ STATUS_RESPONSE = json.load(open("./tests/unit/data/status_response.json", "r"))
 
 
 class FakeDir:
-    """Fake directory object, usable as return value for `os.scandir`."""
+    """Fake directory object, usable as return value for `BaseWorkload.ls`."""
 
     def __init__(self, name):
         self.name = name
@@ -49,7 +49,7 @@ def connect_manager():
         FakeDir("plugin-b"),
         FakeDir(f"relation-7-{hash2}"),
     ]
-    mock_workload.dir_exists = lambda: True
+    mock_workload.dir_exists = lambda _: True
 
     mgr = ConnectManager(context=mock_context, workload=mock_workload)
     yield mgr
