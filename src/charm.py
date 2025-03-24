@@ -30,7 +30,7 @@ from literals import (
     PLUGIN_RESOURCE_KEY,
     SNAP_NAME,
     SUBSTRATE,
-    DebugLevel,
+    LogLevel,
     Status,
     Substrates,
 )
@@ -54,7 +54,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.substrate: Substrates = SUBSTRATE
         self.pending_inactive_statuses: list[Status] = []
 
-        self.workload = Workload()
+        self.workload = Workload(profile=self.config.profile)
         self.context = Context(self, substrate=SUBSTRATE)
         self.auth_manager = AuthManager(
             context=self.context, workload=self.workload, store_path=self.workload.paths.passwords
@@ -110,7 +110,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
     def _set_status(self, key: Status) -> None:
         """Sets charm status."""
         status: StatusBase = key.value.status
-        log_level: DebugLevel = key.value.log_level
+        log_level: LogLevel = key.value.log_level
 
         getattr(logger, log_level.lower())(status.message)
         self.pending_inactive_statuses.append(key)

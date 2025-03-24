@@ -86,6 +86,11 @@ class Paths:
         """Path to JMX Prometheus exporter YAML config file."""
         return f"{self.config_dir}/jmx_prometheus.yaml"
 
+    @property
+    def log4j_properties(self) -> str:
+        """Path to log4j properties file."""
+        return f"{self.config_dir}/log4j.properties"
+
 
 class WorkloadBase(ABC):
     """Base interface for common workload operations."""

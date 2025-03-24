@@ -38,6 +38,7 @@ value.converter.schemas.enable=false
 """
 
 PROPERTIES_BLACKLIST = [
+    "log_level",
     "profile",
     "rest_port",
 ]
@@ -105,7 +106,7 @@ class ConfigManager:
 
     def configure(self) -> None:
         """Make all steps necessary to start the Connect service, including setting env vars, JAAS config and service config files."""
-        self.workload.set_environment(env_vars=[self.kafka_opts])
+        self.workload.set_environment(env_vars=[self.kafka_opts, self.log_level_opts])
         self.save_jaas_config()
         self.save_properties()
 
@@ -151,6 +152,18 @@ class ConfigManager:
         opts = [f"-Djava.security.auth.login.config={self.workload.paths.jaas}", *self.jmx_opts]
 
         return f"KAFKA_OPTS='{' '.join(opts)}'"
+
+    @property
+    def log_level_opts(self) -> str:
+        """Returns the log4j options for configuring the connect service logging."""
+        # Remapping to WARN that is generally used in Java applications based on log4j and logback.
+        log_level = "WARN" if self.config.log_level == "WARNING" else self.config.log_level
+
+        opts = [
+            f"-Dlog4j.configuration=file:{self.workload.paths.log4j_properties} -Dcharmed.kafka.log.level={log_level}"
+        ]
+
+        return f"KAFKA_LOG4J_OPTS='{' '.join(opts)}'"
 
     @property
     def client_auth_properties(self) -> list[str]:

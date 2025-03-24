@@ -4,22 +4,14 @@
 
 """Structured configuration for the Kafka Connect charm."""
 import logging
-from enum import Enum
 from typing import Literal
 
 from charms.data_platform_libs.v0.data_models import BaseConfigModel
 from pydantic import validator
 
+from literals import CharmProfile, LogLevel
+
 logger = logging.getLogger(__name__)
-
-
-class LogLevel(str, Enum):
-    """Enum for the `log_level` field."""
-
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    DEBUG = "DEBUG"
 
 
 class CharmConfig(BaseConfigModel):
@@ -27,7 +19,8 @@ class CharmConfig(BaseConfigModel):
 
     exactly_once_source_support: Literal["disabled", "enabled"]
     key_converter: str
-    profile: Literal["testing", "production"]
+    log_level: LogLevel
+    profile: CharmProfile
     rest_port: int
     value_converter: str
 

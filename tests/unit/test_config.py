@@ -64,6 +64,8 @@ def test_defaults(ctx: Context, base_state: State) -> None:
     assert "# profile=production" in charm.config_manager.properties
     assert "rest_port=8083" not in charm.config_manager.properties
     assert "# rest_port=8083" in charm.config_manager.properties
+    assert "log_level=INFO" not in charm.config_manager.properties
+    assert "# log_level=INFO" in charm.config_manager.properties
 
 
 @pytest.mark.parametrize(
@@ -72,6 +74,10 @@ def test_defaults(ctx: Context, base_state: State) -> None:
         ConfigOverride(key="exactly_once_source_support", values=["enabled", "disabled"]),
         ConfigOverride(
             key="exactly_once_source_support", values=["abc", None, 123, True, "true"], valid=False
+        ),
+        ConfigOverride(key="log_level", values=["DEBUG", "ERROR", "INFO", "WARNING"]),
+        ConfigOverride(
+            key="log_level", values=["CRITICAL", "test", True, None, 1000], valid=False
         ),
         ConfigOverride(key="profile", values=["testing", "production"]),
         ConfigOverride(key="profile", values=["unknown", "test", None, 123, True], valid=False),
@@ -91,3 +97,11 @@ def test_validator(override: ConfigOverride) -> None:
         else:
             config = CharmConfig(**target_config)
             assert getattr(config, override.key) == value
+
+
+def test_empty_string_validator() -> None:
+    """Checks empty string will be converted to None and raise a ValidationError."""
+    defaults = {k: v["default"] for k, v in CONFIG["options"].items()}
+
+    with pytest.raises(ValidationError):
+        _ = CharmConfig(**defaults | {"key_converter": ""})
