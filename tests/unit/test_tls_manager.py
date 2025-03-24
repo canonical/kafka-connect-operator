@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+import json
+import logging
+import subprocess
+from typing import Mapping
+from unittest.mock import MagicMock
+
+import pytest
+from charms.tls_certificates_interface.v3.tls_certificates import (
+    generate_ca,
+    generate_certificate,
+    generate_csr,
+    generate_private_key,
+)
+from src.core.models import Context as CharmContext
+from src.core.models import TLSContext
+from src.core.workload import WorkloadBase
+from src.literals import SUBSTRATE
+from src.managers.tls import Sans, TLSManager
+
+logger = logging.getLogger(__name__)
+
+UNIT_NAME = "kafka-connect/0"
+INTERNAL_ADDRESS = "10.10.10.10"
+BIND_ADDRESS = "10.20.20.20"
+KEYTOOL = "keytool"
+
+
+def _exec(
+    command: list[str] | str,
+    env: Mapping[str, str] | None = None,
+    working_dir: str | None = None,
+    _: bool = False,
+) -> str:
+    _command = " ".join(command) if isinstance(command, list) else command
+    print(_command)
+
+    for bin in ("chown", "chmod"):
+        if _command.startswith(bin):
+            return "ok"
+
+    try:
+        output = subprocess.check_output(
+            command,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            shell=isinstance(command, str),
+            env=env,
+            cwd=working_dir,
+        )
+        return output
+    except subprocess.CalledProcessError as e:
+        raise e
+
+
+try:
+    _exec(KEYTOOL)
+    KEYTOOL_EXISTS = True
+except subprocess.CalledProcessError:
+    KEYTOOL_EXISTS = False
+
+
+@pytest.fixture()
+def tls_manager(tmp_path_factory):
+    """A TLSManager instance with minimal functioning mock `Workload` and `Context`."""
+    mock_workload = MagicMock(spec=WorkloadBase)
+    mock_workload.write = lambda content, path: open(path, "w").write(content)
+    mock_workload.exec = _exec
+    mock_workload.paths.config_dir = tmp_path_factory.mktemp("workload")
+    mock_workload.paths.keystore = f"{mock_workload.paths.config_dir}/keystore.p12"
+    mock_workload.paths.truststore = f"{mock_workload.paths.config_dir}/truststore.jks"
+
+    mock_context = MagicMock(spec=CharmContext)
+
+    ca_key = generate_private_key()
+    ca = generate_ca(private_key=ca_key, subject="TEST-CA")
+
+    intermediate_key = generate_private_key()
+    intermediate_csr = generate_csr(private_key=intermediate_key, subject="INTERMEDIATE-CA")
+    intermediate_cert = generate_certificate(intermediate_csr, ca, ca_key)
+
+    private_key = generate_private_key()
+    csr = generate_csr(
+        private_key=private_key,
+        subject=UNIT_NAME,
+        sans_ip=[INTERNAL_ADDRESS],
+        sans_dns=[UNIT_NAME],
+    )
+    cert = generate_certificate(csr, ca, ca_key)
+
+    data = {
+        TLSContext.CA: ca.decode("utf-8"),
+        TLSContext.CHAIN: json.dumps([intermediate_cert.decode("utf-8")]),
+        TLSContext.CERT: cert.decode("utf-8"),
+        TLSContext.PRIVATE_KEY: private_key.decode("utf-8"),
+        TLSContext.KEYSTORE_PASSWORD: "keystore-password",
+        TLSContext.TRUSTSTORE_PASSWORD: "truststore-password",
+    }
+    tls_context = TLSContext(MagicMock(), MagicMock(), None)
+    tls_context.relation_data = data
+
+    mock_context.worker_unit.tls = tls_context
+    mock_context.worker_unit.internal_address = INTERNAL_ADDRESS
+    mock_context.worker_unit.unit.name = UNIT_NAME
+    mock_context.bind_address = BIND_ADDRESS
+
+    mgr = TLSManager(context=mock_context, workload=mock_workload, substrate=SUBSTRATE)
+    mgr.keytool = KEYTOOL
+    yield mgr
+
+
+@pytest.mark.skipif(not KEYTOOL_EXISTS, reason=f"Can't locate {KEYTOOL} in the test environment.")
+@pytest.mark.parametrize("tls_initialized", [False, True], ids=["TLS NOT initialized", "TLS initialized"])
+@pytest.mark.parametrize("with_intermediate_ca", [False, True], ids=["NO intermediate CA", "ONE intermediate CA"])
+def test_lifecycle(
+    tls_manager: TLSManager,
+    caplog: pytest.LogCaptureFixture,
+    tls_initialized: bool,
+    with_intermediate_ca: bool,
+) -> None:
+    """..."""
+    if not tls_initialized:
+        tls_manager.tls_context.relation_data = {}
+        tls_manager.context.peer_workers.relation_data = {"tls": ""}
+
+    if not with_intermediate_ca and tls_initialized:
+        del tls_manager.tls_context.relation_data[TLSContext.CHAIN]
+
+    caplog.set_level(logging.DEBUG)
+    tls_manager.set_ca()
+    tls_manager.set_chain()
+    tls_manager.set_server_key()
+    tls_manager.set_certificate()
+    tls_manager.set_bundle()
+    tls_manager.configure()
+
+    if not tls_initialized:
+        return
+
+    # build another cert
+    ca_key = generate_private_key()
+    ca = generate_ca(private_key=ca_key, subject="SOME-CA")
+    csr = generate_csr(private_key=generate_private_key(), subject="some-app/0")
+    cert = generate_certificate(csr, ca, ca_key)
+
+    # check import cert functionality
+    tls_manager.import_cert(
+        alias="some-app", filename="some-app", cert_content=cert.decode("utf-8")
+    )
+    # import again with the same alias
+    tls_manager.import_cert(
+        alias="some-app", filename="other-file", cert_content=cert.decode("utf-8")
+    )
+
+    # check remove cert functionality
+    tls_manager.remove_cert("some-app")
+
+    tls_manager.remove_cert("other-app")
+    log_record = caplog.records[-1]
+    assert "alias <other-app> does not exist" in log_record.msg.lower()
+    assert log_record.levelname == "WARNING"
+
+    # check SANs 
+    current_sans = tls_manager.get_current_sans()
+    assert current_sans and current_sans == Sans(sans_ip=[INTERNAL_ADDRESS], sans_dns=[UNIT_NAME])
+    expected_sans = tls_manager.build_sans()
+    assert expected_sans.sans_ip == current_sans.sans_ip
+    assert expected_sans.sans_dns != current_sans.sans_dns
+
+    # since we didn't add our FQDN to the cert SANS, we expect a change being detected:
+    assert tls_manager.sans_change_detected
+
+    # if with_intermediate_ca:
+    #     import pdb
+    #     pdb.set_trace()
+
+
+def test_simulate_os_errors(tls_manager: TLSManager):
+    """..."""
+
+    def _erroneous_hook(*args, **kwargs):
+        raise subprocess.CalledProcessError(
+            returncode=1, cmd="command", stderr="Some error occurred"
+        )
+
+    tls_manager.workload.exec = _erroneous_hook
+    tls_manager.workload.write = _erroneous_hook
+
+    for method in dir(TLSManager):
+        if not method.startswith("set_") or method == "set_chain":
+            continue
+
+        with pytest.raises(subprocess.CalledProcessError):
+            print(f"Calling {method}")
+            getattr(tls_manager, method)()
+
+    with pytest.raises(subprocess.CalledProcessError):
+        tls_manager.remove_cert("some-alias")
+
+    with pytest.raises(subprocess.CalledProcessError):
+        tls_manager.get_current_sans()
+
+
+def _list():
+    return
+    raw = _exec(f"keytool -storepass truststore-password -keystore {tls_manager.workload.paths.config_dir}/truststore.jks -list")
+    lines = [l for l in raw.split("\n") if l]
+    matches = re.findall("(.+?),.+?trustedCertEntry.*?\n.+?([0-9a-fA-F:]{95})\n", raw)
+
+    for m in matches:
+        name, raw_fingerprint = m
+        original_cert = load_pem_x509_certificate(open(f"{tls_manager.workload.paths.config_dir}/{name}.pem", "rb").read(), default_backend())
+        original_fingerprint = original_cert.fingerprint(original_cert.signature_hash_algorithm)
+        loaded_fingerprint = bytes([int(s, 16) for s in raw_fingerprint.split(":")])
+        assert loaded_fingerprint == original_fingerprint
