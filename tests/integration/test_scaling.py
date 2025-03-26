@@ -144,7 +144,7 @@ async def test_destroy_active_workers(ops_test: OpsTest):
     assert "RUNNING" in ops_test.model.applications[INTEGRATOR].status_message
 
     status_resp = await make_connect_api_request(ops_test, endpoint="connectors?expand=status")
-    remaining_unit = ops_test.model.applications[INTEGRATOR].units[0]
+    remaining_unit = ops_test.model.applications[APP_NAME].units[0]
     assert {
         item["status"]["connector"]["worker_id"].split(":")[0]
         for item in status_resp.json().values()
