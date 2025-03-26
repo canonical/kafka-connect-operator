@@ -89,7 +89,13 @@ class TestIntegratorCharm(CharmBase):
             )
             return
 
-        event.add_status(ActiveStatus(self.integrator.task_status))
+        try:
+            event.add_status(ActiveStatus(self.integrator.task_status))
+        except Exception as e:
+            logger.error(e)
+            event.add_status(
+                BlockedStatus("Task Status: error communicating with Kafka Connect, check logs.")
+            )
 
 
 if __name__ == "__main__":
