@@ -44,12 +44,19 @@ PROPERTIES_BLACKLIST = [
 ]
 
 
+CharmConfigType = str | int | bool
+
+
 class ConfigManager:
     """Manager for handling Kafka Connect configuration."""
 
     config: CharmConfig
     workload: WorkloadBase
     context: Context
+
+    VALUE_TRANSLATOR: dict[str, dict[CharmConfigType, str]] = {
+        "exactly_once_source_support": {False: "disabled", True: "enabled"},
+    }
 
     def __init__(
         self,
@@ -82,14 +89,15 @@ class ConfigManager:
             f'{prefix_}sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{username}" password="{password}";',
         ]
 
-    @staticmethod
-    def translate_config_key(key: str):
-        """Format config names into properties.
+    def translate_config(self, key: str, value: str) -> str:
+        """Format `key: value` from charm config into appropriaate Kafka Connect `key=value` properties.
 
         Returns:
-            String with Kafka configuration name to be placed in the server.properties file
+            String with Kafka configuration `key=value` to be placed in the connect properties file.
         """
-        return key.replace("_", ".") if key not in PROPERTIES_BLACKLIST else f"# {key}"
+        translated_value = self.VALUE_TRANSLATOR.get(key, {}).get(value, value)
+        translated_key = key.replace("_", ".") if key not in PROPERTIES_BLACKLIST else f"# {key}"
+        return f"{translated_key}={translated_value}"
 
     def save_jaas_config(self) -> None:
         """Writes JAAS configuration to `JAAS_PATH`."""
@@ -223,7 +231,7 @@ class ConfigManager:
     def charm_config_properties(self) -> list[str]:
         """Returns a list of properties populated from charm config."""
         return [
-            f"{self.translate_config_key(conf_key)}={str(value)}"
+            self.translate_config(conf_key, value)
             for conf_key, value in self.config.dict().items()
             if value is not None
         ]

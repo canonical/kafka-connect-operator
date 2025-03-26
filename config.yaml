@@ -6,11 +6,9 @@ options:
     description: |
       Whether to enable exactly-once support for source connectors in the cluster by using 
       transactions to write source records and their source offsets, and by proactively 
-      fencing out old task generations before bringing up new ones.
-      
-      Allowed values are: "enabled" and "disabled".
-    type: string
-    default: disabled
+      fencing out old task generations before bringing up new ones.      
+    type: boolean
+    default: false
   key_converter:
     description: |
       Converter class used to convert between Kafka Connect format and the serialized form that

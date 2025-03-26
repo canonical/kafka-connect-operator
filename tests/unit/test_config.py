@@ -71,9 +71,11 @@ def test_defaults(ctx: Context, base_state: State) -> None:
 @pytest.mark.parametrize(
     "override",
     [
-        ConfigOverride(key="exactly_once_source_support", values=["enabled", "disabled"]),
+        ConfigOverride(key="exactly_once_source_support", values=[False, True]),
         ConfigOverride(
-            key="exactly_once_source_support", values=["abc", None, 123, True, "true"], valid=False
+            key="exactly_once_source_support",
+            values=["abc", None, 123, "enabled", "disabled"],
+            valid=False,
         ),
         ConfigOverride(key="log_level", values=["DEBUG", "ERROR", "INFO", "WARNING"]),
         ConfigOverride(
