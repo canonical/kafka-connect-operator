@@ -585,19 +585,15 @@ class BaseIntegrator(ABC, Object):
 
     def stop_task(self) -> None:
         """Stops the connector task."""
-        if self.task_names:
-            for task_name in self.task_names:
-                    try:
-                        self._client.stop_task(task_name=task_name)
-                    except ConnectApiError as e:
-                        logger.error(f"Task stop failed, details: {e}")
-                        return
-        else:
-            try:
+        try:
+            if self.task_names:
+                for task_name in self.task_names:
+                    self._client.stop_task(task_name=task_name)
+            else:
                 self._client.stop_task()
-            except ConnectApiError as e:
-                logger.error(f"Task stop failed, details: {e}")
-                return
+        except ConnectApiError as e:
+            logger.error(f"Task stop failed, details: {e}")
+            return
 
         self.teardown()
         self.started = False
