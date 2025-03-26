@@ -56,7 +56,7 @@ async def mysql_test_data(ops_test: OpsTest, request: pytest.FixtureRequest):
         # print a truncated output
         print(cmd.replace(mysql_root_pass, "******")[:1000])
         return_code, _, _ = await ops_test.juju("ssh", f"{mysql_leader.name}", cmd)
-        # assert return_code == 0
+        assert return_code == 0
 
     for i in range(1, params.no_tables + 1):
 
