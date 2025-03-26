@@ -126,7 +126,7 @@ async def test_destroy_active_workers(ops_test: OpsTest):
 
     This test ensures that connector tasks are resumed on remaining worker(s).
     """
-    for _ in range(2):
+    while len(ops_test.model.applications[APP_NAME].units) > 1:
         await destroy_active_workers(ops_test)
 
         async with ops_test.fast_forward(fast_interval="60s"):
@@ -142,3 +142,10 @@ async def test_destroy_active_workers(ops_test: OpsTest):
         await asyncio.sleep(120)
 
     assert "RUNNING" in ops_test.model.applications[INTEGRATOR].status_message
+
+    status_resp = await make_connect_api_request(ops_test, endpoint="connectors?expand=status")
+    remaining_unit = ops_test.model.applications[INTEGRATOR].units[0]
+    assert {
+        item["status"]["connector"]["worker_id"].split(":")[0]
+        for item in status_resp.json().values()
+    } == {await get_unit_ipv4_address(ops_test, remaining_unit)}
