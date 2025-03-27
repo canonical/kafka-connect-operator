@@ -13,13 +13,13 @@ This operator can be found on [Charmhub](https://charmhub.io/kafka-connect) and 
 - Automated or manual connector plugins management.
 - Fault-tolerance, replication and scalability out-of-the-box.
 - Authenticaon on REST API enabled by default.
-- TLS support both on the REST API and Kafka cluster relations.
-- Seamless integration with Charmed Kafka set of operators
+- TLS support both on the REST API and Apache Kafka cluster relations.
+- Seamless integration with Charmed Apache Kafka set of operators
 - Seamless integration with an ecosystem of of Integrator charms supporting common ETL tasks on different database technologies offered by [Canonical Data Platform](https://canonical.com/data).
 
 The Apache Kafka Connect Operator uses the latest Apache Kafka release, made available using the [*charmed-kafka* snap](https://github.com/canonical/charmed-kafka-snap) distributed by Canonical.
 
-As Apache Kafka Connect requires a running Kafka cluster, this operator makes use of the [Kafka Operator](https://github.com/canonical/kafka-operator) in order to function.
+Since Kafka Connect requires a running Apache Kafka cluster, this charmed operator makes use of the [Charmed Apache Kafka](https://github.com/canonical/kafka-operator) in order to function.
 
 ## Usage
 
@@ -31,7 +31,7 @@ Before using Apache Kafka Connect, a Kafka cluster needs to be deployed. The Cha
 $ juju deploy kafka --channel 3/edge -n 3 --config roles="broker,controller"
 ```
 
-To deploy the Charmed Apache Kafka Connect operator and relate it with the Kafka cluster, use the following commands:
+To deploy the Charmed Apache Kafka Connect operator and relate it with the Apache Kafka cluster, use the following commands:
 
 ```shell
 $ juju deploy kafka-connect --channel latest/edge
@@ -42,7 +42,7 @@ To watch the process, `juju status` can be used. Once all the units show as `act
 
 ### Plugin Management
 
-Apache Kafka Connect uses a pluggable architecture model, meaning that the user could add desired functionalities by means of **Plugins**, also known as **Connectors**. Simply put, plugins are bundles of JAR files adhering to Apache Kafka Connect Connector Interface. These connectors could be an implementation of a data source connector, data sink connector, a transformer or a converter. Apache Kafka Connect automatically discovers added plugins, and the user could use the exposed REST interface to define desired ETL tasks based on available plugins.
+Kafka Connect uses a pluggable architecture model, meaning that the user could add desired functionalities by means of **Plugins**, also known as **Connectors**. Simply put, plugins are bundles of JAR files adhering to Apache Kafka Connect Connector Interface. These connectors could be an implementation of a data source connector, data sink connector, a transformer or a converter. Apache Kafka Connect automatically discovers added plugins, and the user could use the exposed REST interface to define desired ETL tasks based on available plugins.
 
 In the Charmed Apache Kafka Connect operator, adding a plugin is as simple as calling the `juju attach-resource` command. Make sure that you bundle all required JAR files into a single TAR archive (let's call that `my-plugin.tar`) and then use the following command:
 
@@ -133,4 +133,4 @@ Also, if you truly enjoy working on open-source projects like this one and you w
 
 ## License
 
-The Charmed Karapace K8s Operator is free software, distributed under the Apache Software License, version 2.0. See [LICENSE](https://github.com/canonical/kafka-connect-operator/blob/main/LICENSE) for more information.
+The Charmed Kafka Connect Operator is free software, distributed under the Apache Software License, version 2.0. See [LICENSE](https://github.com/canonical/kafka-connect-operator/blob/main/LICENSE) for more information.
