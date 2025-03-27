@@ -23,8 +23,6 @@ Since Kafka Connect requires a running Apache Kafka cluster, this charmed operat
 
 ## Usage
 
-### Deployment and Basic Usage
-
 Before using Apache Kafka Connect, a Kafka cluster needs to be deployed. The Charmed Kafka operator can be deployed as follows:
 
 ```shell
@@ -58,13 +56,13 @@ There is no limit for the number of plugins that could be added manually. Howeve
 
 The Charmed Apache Kafka Connect Operator supports Juju [relations](https://juju.is/docs/olm/relations) for interfaces listed below.
 
-#### `connect_client` interface:
+#### The `connect_client` interface
 
 The `connect_client` interface is used with any requirer/integrator charm adhering to the `connect-client` charm relation interface. Integrators will automatically handle connectors/tasks lifecycle on Apache Kafka Connect including plugin management, startup, cleanup, and scaling, and simplify common ETL operations on Data Platform line of products.
 
 A curated set of integrators for common ETL use cases within the Canonical Data Platform product line is available in the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) repository. These integrators support use cases such as loading data to and from MySQL, PostgreSQL, OpenSearch, S3-compatible storage services, and active/passive replication of Apache Kafka topics using MirrorMaker.
 
-#### `tls-certificates` interface:
+#### The `tls-certificates` interface
 
 The `tls-certificates` interface could be used with any charm that adheres to [`tls-certifcates`](https://github.com/canonical/charm-relation-interfaces/tree/main/docs/json_schemas/tls_certificates/v1) **provider** charm relation interface. One example is the [`self-signed-certificates`](https://github.com/canonical/self-signed-certificates-operator) operator by Canonical.
 
@@ -96,7 +94,7 @@ juju remove-relation kafka-connect self-signed-certificates
 juju remove-relation kafka self-signed-certificates
 ```
 
-Note: The TLS settings here are for self-signed-certificates which are not recommended for production clusters, the `tls-certificates-operator` charm offers a variety of configurations, read more on the TLS charm [here](https://charmhub.io/tls-certificates-operator)
+> Note: The TLS settings here are for self-signed-certificates which are not recommended for production clusters, the `tls-certificates-operator` charm offers a variety of configurations, read more on the TLS charm [here](https://charmhub.io/tls-certificates-operator)
 
 ## Monitoring
 
@@ -115,7 +113,7 @@ Next, deploy [grafana-agent](https://charmhub.io/grafana-agent) and follow the
 [tutorial](https://discourse.charmhub.io/t/using-the-grafana-agent-machine-charm/8896)
 to relate it to the COS Lite offers.
 
-Now, relate `kafka-connect` with the grafana-agent:
+Now, relate `kafka-connect` with the `grafana-agent`:
 
 ```shell
 juju integrate kafka-connect grafana-agent
