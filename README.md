@@ -11,7 +11,7 @@ The Charmed Apache Kafka Connect Operator delivers automated operations manageme
 This operator can be found on [Charmhub](https://charmhub.io/kafka-connect) and it comes with production-ready features such as:
 
 - Automated or manual connector plugins management.
-- Fault-tolerance, replication and scalability out-of-the-box.
+- Fault-tolerance, replication and scalability out of the box.
 - Authenticaon on REST API enabled by default.
 - TLS support both on the REST API and Apache Kafka cluster relations.
 - Seamless integration with Charmed Apache Kafka set of operators
@@ -44,15 +44,15 @@ To watch the process, `juju status` can be used. Once all the units show as `act
 
 Kafka Connect uses a pluggable architecture model, meaning that the user could add desired functionalities by means of **Plugins**, also known as **Connectors**. Simply put, plugins are bundles of JAR files adhering to Apache Kafka Connect Connector Interface. These connectors could be an implementation of a data source connector, data sink connector, a transformer or a converter. Apache Kafka Connect automatically discovers added plugins, and the user could use the exposed REST interface to define desired ETL tasks based on available plugins.
 
-In the Charmed Apache Kafka Connect operator, adding a plugin is as simple as calling the `juju attach-resource` command. Make sure that you bundle all required JAR files into a single TAR archive (let's call that `my-plugin.tar`) and then use the following command:
+In the Charmed Apache Kafka Connect operator, adding a plugin is as simple as calling the `juju attach-resource` command. Make sure that you bundle all required JAR files into a single TAR archive (for example, `my-plugin.tar`) and then use the following command:
 
 ```shell
 juju attach-resource kafka-connect connect-plugin=./my-plugin.tar
 ```
 
-This would trigger a restart of `kafka-connect` charm, once all units show as `active|idle`, your desired plugin is ready to use. 
+This would trigger a restart of the `kafka-connect` charm. Once all units are shown as `active|idle`, your new plugin is ready for use. 
 
-There is no limit on the number of plugins that could be manually added. However, the recommended way for common use-cases of ETL tasks on Data Platform charmed operators is by using the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) charm.
+There is no limit for the number of plugins that could be added manually. However, for common use-cases of ETL tasks on Data Platform charmed operators we recommend using the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) charm.
 
 ## Relations
 
@@ -62,17 +62,17 @@ The Charmed Apache Kafka Connect Operator supports Juju [relations](https://juju
 
 The `connect_client` interface is used with any requirer/integrator charm adhering to the `connect-client` charm relation interface. Integrators will automatically handle connectors/tasks lifecycle on Apache Kafka Connect including plugin management, startup, cleanup, and scaling, and simplify common ETL operations on Data Platform line of products.
 
-A curated set of integrators for common ETL use cases on Canonical Data Platform line of products are provided in the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) repository. These cover use-cases such as loading data from/to MySQL, PostgreSQL, Opensearch, S3-compliant storage services, and active/passive replication of Apache Kafka topics using MirrorMaker.
+A curated set of integrators for common ETL use cases within the Canonical Data Platform product line is available in the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) repository. These integrators support use cases such as loading data to and from MySQL, PostgreSQL, OpenSearch, S3-compatible storage services, and active/passive replication of Apache Kafka topics using MirrorMaker.
 
 #### `tls-certificates` interface:
 
 The `tls-certificates` interface could be used with any charm that adheres to [`tls-certifcates`](https://github.com/canonical/charm-relation-interfaces/tree/main/docs/json_schemas/tls_certificates/v1) **provider** charm relation interface. One example is the [`self-signed-certificates`](https://github.com/canonical/self-signed-certificates-operator) operator by Canonical.
 
-Note that TLS could be enabled in three different modes:
+Note that TLS can be enabled in three different modes:
 
 - For Apache Kafka Connect REST interface only
-- Only on the relation between Apache Kafka cluster and Apache Kafka Connect.
-- Both.
+- For the relation between Apache Kafka cluster and Apache Kafka Connect
+- For both the REST interface and the relation
 
 To enable TLS on the Apache Kafka Connect REST interface, use following commands:
 
