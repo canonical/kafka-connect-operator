@@ -113,8 +113,12 @@ def tls_manager(tmp_path_factory):
 
 
 @pytest.mark.skipif(not KEYTOOL_EXISTS, reason=f"Can't locate {KEYTOOL} in the test environment.")
-@pytest.mark.parametrize("tls_initialized", [False, True], ids=["TLS NOT initialized", "TLS initialized"])
-@pytest.mark.parametrize("with_intermediate_ca", [False, True], ids=["NO intermediate CA", "ONE intermediate CA"])
+@pytest.mark.parametrize(
+    "tls_initialized", [False, True], ids=["TLS NOT initialized", "TLS initialized"]
+)
+@pytest.mark.parametrize(
+    "with_intermediate_ca", [False, True], ids=["NO intermediate CA", "ONE intermediate CA"]
+)
 def test_lifecycle(
     tls_manager: TLSManager,
     caplog: pytest.LogCaptureFixture,
@@ -163,7 +167,7 @@ def test_lifecycle(
     assert "alias <other-app> does not exist" in log_record.msg.lower()
     assert log_record.levelname == "WARNING"
 
-    # check SANs 
+    # check SANs
     current_sans = tls_manager.get_current_sans()
     assert current_sans and current_sans == Sans(sans_ip=[INTERNAL_ADDRESS], sans_dns=[UNIT_NAME])
     expected_sans = tls_manager.build_sans()
@@ -202,17 +206,3 @@ def test_simulate_os_errors(tls_manager: TLSManager):
 
     with pytest.raises(subprocess.CalledProcessError):
         tls_manager.get_current_sans()
-
-
-def _list():
-    return
-    raw = _exec(f"keytool -storepass truststore-password -keystore {tls_manager.workload.paths.config_dir}/truststore.jks -list")
-    lines = [l for l in raw.split("\n") if l]
-    matches = re.findall("(.+?),.+?trustedCertEntry.*?\n.+?([0-9a-fA-F:]{95})\n", raw)
-
-    for m in matches:
-        name, raw_fingerprint = m
-        original_cert = load_pem_x509_certificate(open(f"{tls_manager.workload.paths.config_dir}/{name}.pem", "rb").read(), default_backend())
-        original_fingerprint = original_cert.fingerprint(original_cert.signature_hash_algorithm)
-        loaded_fingerprint = bytes([int(s, 16) for s in raw_fingerprint.split(":")])
-        assert loaded_fingerprint == original_fingerprint
