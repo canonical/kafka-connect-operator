@@ -1,10 +1,10 @@
-# Charmed Apache Kafka Connect Operator
+# Charmed Kafka Connect Operator
 
 [![Release](https://github.com/canonical/kafka-connect-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/kafka-connect-operator/actions/workflows/release.yaml)
 [![Tests](https://github.com/canonical/kafka-connect-operator/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/canonical/kafka-connect-operator/actions/workflows/ci.yaml?query=branch%3Amain)
 [![Docs](https://github.com/canonical/kafka-connect-operator/actions/workflows/sync_docs.yaml/badge.svg)](https://github.com/canonical/kafka-connect-operator/actions/workflows/sync_docs.yaml)
 
-The Charmed Apache Kafka Connect Operator delivers automated operations management from day 0 to day 2 on [Apache Kafka Connect](https://kafka.apache.org/documentation/#connect).
+The Charmed Kafka Connect Operator delivers automated operations management from day 0 to day 2 on [Kafka Connect](https://kafka.apache.org/documentation/#connect).
 
 This operator can be found on [Charmhub](https://charmhub.io/kafka-connect) and it comes with production-ready features such as:
 
@@ -21,26 +21,26 @@ Since Kafka Connect requires a running Apache Kafka cluster, this charmed operat
 
 ## Usage
 
-Before using Apache Kafka Connect, a Kafka cluster needs to be deployed. The Charmed Kafka operator can be deployed as follows:
+Before using Charmed Kafka Connect, an Apache Kafka cluster needs to be deployed. The Charmed Apache Kafka operator can be deployed as follows:
 
 ```shell
 $ juju deploy kafka --channel 3/edge -n 3 --config roles="broker,controller"
 ```
 
-To deploy the Charmed Apache Kafka Connect operator and relate it with the Apache Kafka cluster, use the following commands:
+To deploy the Charmed Kafka Connect operator and relate it with the Apache Kafka cluster, use the following commands:
 
 ```shell
 $ juju deploy kafka-connect --channel latest/edge
 $ juju integrate kafka-connect kafka
 ```
 
-To watch the process, `juju status` can be used. Once all the units show as `active|idle`, the Apache Kafka Connect cluster is ready to be used.
+To watch the process, `juju status` can be used. Once all the units show as `active|idle`, the Kafka Connect cluster is ready to be used.
 
 ### Plugin Management
 
-Kafka Connect uses a pluggable architecture model, meaning that the user could add desired functionalities by means of **Plugins**, also known as **Connectors**. Simply put, plugins are bundles of JAR files adhering to Apache Kafka Connect Connector Interface. These connectors could be an implementation of a data source connector, data sink connector, a transformer or a converter. Apache Kafka Connect automatically discovers added plugins, and the user could use the exposed REST interface to define desired ETL tasks based on available plugins.
+Kafka Connect uses a pluggable architecture model, meaning that the user could add desired functionalities by means of **Plugins**, also known as **Connectors**. Simply put, plugins are bundles of JAR files adhering to Kafka Connect Connector Interface. These connectors could be an implementation of a data source connector, data sink connector, a transformer or a converter. Kafka Connect automatically discovers added plugins, and the user could use the exposed REST interface to define desired ETL tasks based on available plugins.
 
-In the Charmed Apache Kafka Connect operator, adding a plugin is as simple as calling the `juju attach-resource` command. Make sure that you bundle all required JAR files into a single TAR archive (for example, `my-plugin.tar`) and then use the following command:
+In the Charmed Kafka Connect operator, adding a plugin is as simple as calling the `juju attach-resource` command. Make sure that you bundle all required JAR files into a single TAR archive (for example, `my-plugin.tar`) and then use the following command:
 
 ```shell
 juju attach-resource kafka-connect connect-plugin=./my-plugin.tar
@@ -52,11 +52,11 @@ There is no limit for the number of plugins that could be added manually. Howeve
 
 ## Relations
 
-The Charmed Apache Kafka Connect Operator supports Juju [relations](https://juju.is/docs/olm/relations) for interfaces listed below.
+The Charmed Kafka Connect Operator supports Juju [relations](https://juju.is/docs/olm/relations) for interfaces listed below.
 
 #### The `connect_client` interface
 
-The `connect_client` interface is used with any requirer/integrator charm adhering to the `connect-client` charm relation interface. Integrators will automatically handle connectors/tasks lifecycle on Apache Kafka Connect including plugin management, startup, cleanup, and scaling, and simplify common ETL operations on Data Platform line of products.
+The `connect_client` interface is used with any requirer/integrator charm adhering to the `connect-client` charm relation interface. Integrators will automatically handle connectors/tasks lifecycle on Kafka Connect including plugin management, startup, cleanup, and scaling, and simplify common ETL operations on Data Platform line of products.
 
 A curated set of integrators for common ETL use cases within the Canonical Data Platform product line is available in the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) repository. These integrators support use cases such as loading data to and from MySQL, PostgreSQL, OpenSearch, S3-compatible storage services, and active/passive replication of Apache Kafka topics using MirrorMaker.
 
@@ -66,20 +66,20 @@ The `tls-certificates` interface could be used with any charm that adheres to [`
 
 Note that TLS can be enabled in three different modes:
 
-- For Apache Kafka Connect REST interface only
-- For the relation between Apache Kafka cluster and Apache Kafka Connect
+- For Kafka Connect REST interface only
+- For the relation between Apache Kafka cluster and Kafka Connect
 - For both the REST interface and the relation
 
-To enable TLS on the Apache Kafka Connect REST interface, use following commands:
+To enable TLS on the Kafka Connect REST interface, use following commands:
 
 ```shell
 # deploy the TLS charm
 juju deploy self-signed-certificates --channel=stable
-# to enable TLS on Apache Kafka Connect, relate the applications
+# to enable TLS on Kafka Connect REST endpoint, relate the applications
 juju integrate self-signed-certificates kafka-connect
 ```
 
-To enable TLS on the relation between Apache Kafka cluster and Apache Kafka Connect, use the following commands:
+To enable TLS on the relation between Apache Kafka cluster and Kafka Connect, use the following commands:
 
 ```
 juju integrate self-signed-certificates kafka
@@ -96,14 +96,14 @@ juju remove-relation kafka self-signed-certificates
 
 ## Monitoring
 
-The Charmed Apache Kafka Connect Operator comes with the [JMX exporter](https://github.com/prometheus/jmx_exporter/).
+The Charmed Kafka Connect Operator comes with the [JMX exporter](https://github.com/prometheus/jmx_exporter/).
 The metrics can be queried by accessing the `http://<unit-ip>:9100/metrics` endpoints.
 
 Additionally, the charm provides integration with the [Canonical Observability Stack](https://charmhub.io/topics/canonical-observability-stack).
 
 Deploy the `cos-lite` bundle in a Kubernetes environment. This can be done by following the
 [deployment tutorial](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s).
-Since the Charmed Apache Kafka Operator is deployed on a machine environment, it is needed to offer the endpoints
+Since the Charmed Kafka Connect Operator is deployed on a machine environment, it is needed to offer the endpoints
 of the COS relations. The [offers-overlay](https://github.com/canonical/cos-lite-bundle/blob/main/overlays/offers-overlay.yaml)
 can be used, and this step is shown in the COS tutorial.
 
