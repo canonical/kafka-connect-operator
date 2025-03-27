@@ -4,8 +4,6 @@
 [![Tests](https://github.com/canonical/kafka-connect-operator/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/canonical/kafka-connect-operator/actions/workflows/ci.yaml?query=branch%3Amain)
 [![Docs](https://github.com/canonical/kafka-connect-operator/actions/workflows/sync_docs.yaml/badge.svg)](https://github.com/canonical/kafka-connect-operator/actions/workflows/sync_docs.yaml)
 
-## Overview
-
 The Charmed Apache Kafka Connect Operator delivers automated operations management from day 0 to day 2 on [Apache Kafka Connect](https://kafka.apache.org/documentation/#connect).
 
 This operator can be found on [Charmhub](https://charmhub.io/kafka-connect) and it comes with production-ready features such as:
