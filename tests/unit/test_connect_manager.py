@@ -29,12 +29,13 @@ class FakeDir:
     def __init__(self, name):
         self.name = name
 
+    @property
     def is_dir(self) -> bool:
         return True
 
 
 @pytest.fixture()
-def connect_manager(monkeypatch: pytest.MonkeyPatch):
+def connect_manager():
     """A ConnectManager instance with mock `Workload` and `Context`."""
     mock_workload = MagicMock(spec=WorkloadBase)
     mock_context = MagicMock(spec=Context)
@@ -42,23 +43,16 @@ def connect_manager(monkeypatch: pytest.MonkeyPatch):
     hash1 = f"{random.getrandbits(256):032x}"
     hash2 = f"{random.getrandbits(256):032x}"
 
-    # TODO: we should probably move all `os` dependencies
-    # from the manager to workload and get rid of monkeypatchs here.
-    monkeypatch.setattr(
-        "os.scandir",
-        lambda _: [
-            FakeDir("plugin-a"),
-            FakeDir(f"relation-1-{hash1}"),
-            FakeDir("plugin-b"),
-            FakeDir(f"relation-7-{hash2}"),
-        ],
-    )
-    monkeypatch.setattr("os.path.exists", lambda: True)
+    mock_workload.ls = lambda _: [
+        FakeDir("plugin-a"),
+        FakeDir(f"relation-1-{hash1}"),
+        FakeDir("plugin-b"),
+        FakeDir(f"relation-7-{hash2}"),
+    ]
+    mock_workload.dir_exists = lambda: True
 
     mgr = ConnectManager(context=mock_context, workload=mock_workload)
     yield mgr
-
-    monkeypatch.undo()
 
 
 def test_loaded_client_plugins(connect_manager: ConnectManager) -> None:

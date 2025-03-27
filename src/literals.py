@@ -50,10 +50,8 @@ PEER_REL = "worker"
 CLIENT_REL = "connect-client"
 TLS_REL = "certificates"
 
-# TODO: this should be set using `profile` config option in the future
-LOG_SENSITIVE_OUTPUT = True  # set False for production mode & builds
-
-DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+CharmProfile = Literal["testing", "production"]
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 DatabagScope = Literal["unit", "app"]
 Substrates = Literal["vm", "k8s"]
 ClientModes = Literal["worker", "producer", "consumer"]
@@ -66,7 +64,7 @@ class StatusLevel:
     """Status object helper."""
 
     status: StatusBase
-    log_level: DebugLevel
+    log_level: LogLevel
 
 
 class Status(Enum):

@@ -17,14 +17,14 @@ from ops import pebble
 from tenacity import retry, retry_if_result, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
-from core.workload import WorkloadBase
+from core.workload import DirEntry, WorkloadBase
 from literals import (
     CHARMED_KAFKA_SNAP_REVISION,
     GROUP,
-    LOG_SENSITIVE_OUTPUT,
     SERVICE_NAME,
     SNAP_NAME,
     USER,
+    CharmProfile,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,9 +35,11 @@ class Workload(WorkloadBase):
 
     service: str
 
-    def __init__(self) -> None:
+    def __init__(self, profile: CharmProfile = "production") -> None:
         self.kafka = snap.SnapCache()[SNAP_NAME]
         self.service = SERVICE_NAME
+        self.profile = profile
+        self.log_sensitive_output = profile == "testing"
 
     @override
     def start(self) -> None:
@@ -84,9 +86,9 @@ class Workload(WorkloadBase):
         command: list[str] | str,
         env: Mapping[str, str] | None = None,
         working_dir: str | None = None,
-        sensitive: bool = False,
+        sensitive: bool = True,
     ) -> str:
-        should_log = not sensitive or LOG_SENSITIVE_OUTPUT
+        should_log = not sensitive or self.log_sensitive_output
         try:
             output = subprocess.check_output(
                 command,
@@ -141,15 +143,15 @@ class Workload(WorkloadBase):
         return self.exec(command)
 
     @override
-    def mkdir(self, path: str):
+    def mkdir(self, path: str) -> None:
         self.exec(["mkdir", path])
 
     @override
-    def rmdir(self, path: str):
+    def rmdir(self, path: str) -> None:
         self.exec(["rm", "-r", path])
 
     @override
-    def remove(self, path: str, glob: bool = False):
+    def remove(self, path: str, glob: bool = False) -> None:
         if not glob:
             self.exec(["rm", path])
             return
@@ -158,8 +160,15 @@ class Workload(WorkloadBase):
             self.exec(["rm", "-rf", file])
 
     @override
+    def dir_exists(self, path: str) -> bool:
+        return os.path.isdir(path)
+
+    @override
+    def ls(self, path: str) -> list[DirEntry]:
+        return [DirEntry(name=f.name, is_dir=f.is_dir()) for f in os.scandir(path)]
+
+    @override
     def check_socket(self, host: str, port: int) -> bool:
-        """Checks whether an IPv4 socket is healthy or not."""
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
             return sock.connect_ex((host, port)) == 0
 
@@ -175,7 +184,6 @@ class Workload(WorkloadBase):
     @property
     @override
     def installed(self) -> bool:
-        """Whether the workload service is installed or not."""
         try:
             return bool(self.kafka.services[self.service])
         except (KeyError, snap.SnapNotFoundError):

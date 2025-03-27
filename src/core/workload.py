@@ -8,11 +8,20 @@ import re
 import secrets
 import string
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import BinaryIO, Iterable
 
 from ops.pebble import Layer
 
 from literals import CONFIG_DIR, PLUGIN_PATH, SNAP_NAME
+
+
+@dataclass
+class DirEntry:
+    """Object to represent an entry in directory listing."""
+
+    name: str
+    is_dir: bool
 
 
 class Paths:
@@ -76,6 +85,11 @@ class Paths:
     def jmx_prometheus_config(self) -> str:
         """Path to JMX Prometheus exporter YAML config file."""
         return f"{self.config_dir}/jmx_prometheus.yaml"
+
+    @property
+    def log4j_properties(self) -> str:
+        """Path to log4j properties file."""
+        return f"{self.config_dir}/log4j.properties"
 
 
 class WorkloadBase(ABC):
@@ -153,18 +167,28 @@ class WorkloadBase(ABC):
         ...
 
     @abstractmethod
-    def mkdir(self, path: str):
+    def mkdir(self, path: str) -> None:
         """Creates a new directory at the provided path."""
         ...
 
     @abstractmethod
-    def rmdir(self, path: str):
+    def rmdir(self, path: str) -> None:
         """Removes the directory at the provided path."""
         ...
 
     @abstractmethod
-    def remove(self, path: str, glob: bool = False):
+    def remove(self, path: str, glob: bool = False) -> None:
         """Removes the file at the provided path."""
+        ...
+
+    @abstractmethod
+    def dir_exists(self, path: str) -> bool:
+        """Checks whether a directory exists at provided path on the workload."""
+        ...
+
+    @abstractmethod
+    def ls(self, path: str) -> list[DirEntry]:
+        """Returns a directory listing of provided path on the workload."""
         ...
 
     @abstractmethod

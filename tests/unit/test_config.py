@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, cast
+
+import pytest
+import yaml
+from ops.testing import Context, State
+from pydantic import ValidationError
+from src.charm import ConnectCharm
+from src.core.structured_config import CharmConfig
+from src.managers.config import DEFAULT_CONFIG_OPTIONS
+from typing_extensions import override
+
+logger = logging.getLogger(__name__)
+
+CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
+
+
+@dataclass
+class ConfigOverride:
+    """Helper dataclass for overriding default charm config value(s) in parametrized tests."""
+
+    key: str
+    values: list[Any]
+    valid: bool = True
+
+    @override
+    def __str__(self):
+        state = "VALID" if self.valid else "INVALID"
+        return f'{self.key}: {",".join([str(v) for v in self.values])} -> {state}'
+
+
+def test_defaults(ctx: Context, base_state: State) -> None:
+    """Checks `ConfigManager` populates default config properties properly based on charm config & opinionated, hard-coded defaults."""
+    # Given
+    state_in = base_state
+
+    # When
+    with (ctx(ctx.on.update_status(), state_in) as mgr,):
+        charm: ConnectCharm = cast(ConnectCharm, mgr.charm)
+        _ = mgr.run()
+
+    # Then
+    for line in DEFAULT_CONFIG_OPTIONS.split("\n"):
+        assert line.strip() in charm.config_manager.properties
+
+    assert "exactly.once.source.support=disabled" in charm.config_manager.properties
+    assert (
+        "key.converter=org.apache.kafka.connect.json.JsonConverter"
+        in charm.config_manager.properties
+    )
+    assert (
+        "value.converter=org.apache.kafka.connect.json.JsonConverter"
+        in charm.config_manager.properties
+    )
+
+    # blacklists assertion
+    assert "profile=production" not in charm.config_manager.properties
+    assert "# profile=production" in charm.config_manager.properties
+    assert "rest_port=8083" not in charm.config_manager.properties
+    assert "# rest_port=8083" in charm.config_manager.properties
+    assert "log_level=INFO" not in charm.config_manager.properties
+    assert "# log_level=INFO" in charm.config_manager.properties
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        ConfigOverride(key="exactly_once_source_support", values=[False, True]),
+        ConfigOverride(
+            key="exactly_once_source_support",
+            values=["abc", None, 123, "enabled", "disabled"],
+            valid=False,
+        ),
+        ConfigOverride(key="log_level", values=["DEBUG", "ERROR", "INFO", "WARNING"]),
+        ConfigOverride(
+            key="log_level", values=["CRITICAL", "test", True, None, 1000], valid=False
+        ),
+        ConfigOverride(key="profile", values=["testing", "production"]),
+        ConfigOverride(key="profile", values=["unknown", "test", None, 123, True], valid=False),
+    ],
+    ids=lambda override: f"{override}",
+)
+def test_validator(override: ConfigOverride) -> None:
+    """Tests `CharmConfig` validator functionality."""
+    defaults = {k: v["default"] for k, v in CONFIG["options"].items()}
+
+    for value in override.values:
+        target_config = defaults | {override.key: value}
+
+        if not override.valid:
+            with pytest.raises(ValidationError):
+                config = CharmConfig(**target_config)
+        else:
+            config = CharmConfig(**target_config)
+            assert getattr(config, override.key) == value
+
+
+def test_empty_string_validator() -> None:
+    """Checks empty string will be converted to None and raise a ValidationError."""
+    defaults = {k: v["default"] for k, v in CONFIG["options"].items()}
+
+    with pytest.raises(ValidationError):
+        _ = CharmConfig(**defaults | {"key_converter": ""})

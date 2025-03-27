@@ -48,7 +48,12 @@ async def test_deploy_app_and_integrator(
 
     # deploy kafka & kafka connect
     await asyncio.gather(
-        ops_test.model.deploy(kafka_connect_charm, application_name=APP_NAME, series="jammy"),
+        ops_test.model.deploy(
+            kafka_connect_charm,
+            application_name=APP_NAME,
+            series="jammy",
+            config={"profile": "testing"},
+        ),
         ops_test.model.deploy(
             KAFKA_APP,
             channel=KAFKA_CHANNEL,

@@ -185,12 +185,7 @@ def test_tls_certificate_available(
 
     # Then
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
-    assert tls_manager_mock.set_truststore.call_count == 1
-    assert tls_manager_mock.set_keystore.call_count == 1
-    assert tls_manager_mock.set_ca.call_count == 1
-    assert tls_manager_mock.set_certificate.call_count == 1
-    assert tls_manager_mock.set_chain.call_count == 1
-    assert tls_manager_mock.set_server_key.call_count == 1
+    tls_manager_mock.configure.assert_called_once()
     assert peer_rel.local_unit_data.get(TLSContext.CERT, "")
     assert peer_rel.local_unit_data.get(TLSContext.CA, "")
     assert peer_rel.local_unit_data.get(TLSContext.CHAIN, "")

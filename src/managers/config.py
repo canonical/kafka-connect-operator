@@ -14,13 +14,11 @@ from core.structured_config import CharmConfig
 from core.workload import WorkloadBase
 from literals import (
     DEFAULT_AUTH_CLASS,
-    DEFAULT_CONVERTER_CLASS,
     GROUP_ID,
     JMX_EXPORTER_PORT,
     REPLICATION_FACTOR,
     TOPICS,
     ClientModes,
-    Converters,
     InternalTopics,
 )
 
@@ -28,9 +26,25 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_OPTIONS = """
 offset.flush.interval.ms=10000
+heartbeat.interval.ms=3000
+rebalance.timeout.ms=60000
+session.timeout.ms=10000
+ssl.enabled.protocols=TLSv1.3
+ssl.protocol=TLSv1.3
+worker.sync.timeout.ms=3000
+worker.unsync.backoff.ms=300000
 key.converter.schemas.enable=false
 value.converter.schemas.enable=false
 """
+
+PROPERTIES_BLACKLIST = [
+    "log_level",
+    "profile",
+    "rest_port",
+]
+
+
+CharmConfigType = str | int | bool
 
 
 class ConfigManager:
@@ -39,6 +53,10 @@ class ConfigManager:
     config: CharmConfig
     workload: WorkloadBase
     context: Context
+
+    VALUE_TRANSLATOR: dict[str, dict[CharmConfigType, str]] = {
+        "exactly_once_source_support": {False: "disabled", True: "enabled"},
+    }
 
     def __init__(
         self,
@@ -51,12 +69,6 @@ class ConfigManager:
         self.workload = workload
         self.config = config
         self.current_version = current_version
-
-    def _add_converter(
-        self, converter_mode: Converters, converter_class: str = DEFAULT_CONVERTER_CLASS
-    ) -> str:
-        """Returns key=value configuration entry for a given converter."""
-        return f"{converter_mode}.converter={converter_class}"
 
     def _add_topic(
         self, mode: str, topic_name: InternalTopics, replication_factor: int = -1
@@ -77,6 +89,16 @@ class ConfigManager:
             f'{prefix_}sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="{username}" password="{password}";',
         ]
 
+    def translate_config(self, key: str, value: str) -> str:
+        """Format `key: value` from charm config into appropriaate Kafka Connect `key=value` properties.
+
+        Returns:
+            String with Kafka configuration `key=value` to be placed in the connect properties file.
+        """
+        translated_value = self.VALUE_TRANSLATOR.get(key, {}).get(value, value)
+        translated_key = key.replace("_", ".") if key not in PROPERTIES_BLACKLIST else f"# {key}"
+        return f"{translated_key}={translated_value}"
+
     def save_jaas_config(self) -> None:
         """Writes JAAS configuration to `JAAS_PATH`."""
         if not self.jaas_config:
@@ -92,17 +114,9 @@ class ConfigManager:
 
     def configure(self) -> None:
         """Make all steps necessary to start the Connect service, including setting env vars, JAAS config and service config files."""
-        self.workload.set_environment(env_vars=[self.kafka_opts])
+        self.workload.set_environment(env_vars=[self.kafka_opts, self.log_level_opts])
         self.save_jaas_config()
         self.save_properties()
-
-    @property
-    def converter_properties(self) -> list[str]:
-        """Returns the list of configuration for all converters."""
-        properties = []
-        for converter in ("key", "value"):
-            properties.append(self._add_converter(converter_mode=converter))
-        return properties
 
     @property
     def topic_properties(self) -> list[str]:
@@ -146,6 +160,18 @@ class ConfigManager:
         opts = [f"-Djava.security.auth.login.config={self.workload.paths.jaas}", *self.jmx_opts]
 
         return f"KAFKA_OPTS='{' '.join(opts)}'"
+
+    @property
+    def log_level_opts(self) -> str:
+        """Returns the log4j options for configuring the connect service logging."""
+        # Remapping to WARN that is generally used in Java applications based on log4j and logback.
+        log_level = "WARN" if self.config.log_level == "WARNING" else self.config.log_level
+
+        opts = [
+            f"-Dlog4j.configuration=file:{self.workload.paths.log4j_properties} -Dcharmed.kafka.log.level={log_level}"
+        ]
+
+        return f"KAFKA_LOG4J_OPTS='{' '.join(opts)}'"
 
     @property
     def client_auth_properties(self) -> list[str]:
@@ -202,6 +228,15 @@ class ConfigManager:
         ]
 
     @property
+    def charm_config_properties(self) -> list[str]:
+        """Returns a list of properties populated from charm config."""
+        return [
+            self.translate_config(conf_key, value)
+            for conf_key, value in self.config.dict().items()
+            if value is not None
+        ]
+
+    @property
     def properties(self) -> list[str]:
         """Returns all properties necessary for starting Kafka Connect service."""
         properties = (
@@ -216,8 +251,8 @@ class ConfigManager:
             + self.rest_auth_properties
             + self.client_auth_properties
             + self.client_tls_properties
-            + self.converter_properties
             + self.topic_properties
+            + self.charm_config_properties
         )
 
         return properties
