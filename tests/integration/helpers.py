@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import json
+import logging
 import re
 import socket
 import ssl
@@ -26,6 +27,9 @@ from requests.auth import HTTPBasicAuth
 
 from core.models import PeerWorkersContext
 from literals import CONFIG_DIR, DEFAULT_API_PORT
+
+logger = logging.getLogger(__name__)
+
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -278,3 +282,24 @@ async def self_signed_ca(ops_test: OpsTest, app_name: str):
         ca_file.write(ca)
         ca_file.close()
         yield ca_file
+
+
+async def assert_connector_statuses(ops_test: OpsTest, **kwargs: int):
+    """Asserts the count of connectors in provided statuses via keyword arguments.
+
+    Sample usage:
+        1) Assert 1 connector is in RUNNING state
+        `await assert_connector_statuses(ops_test, running=1)`
+
+        2) Assert 0 connector is RUNNING, 1 is PAUSED and 1 is STOPPED.
+        `await assert_connector_statuses(ops_test, running=0, paused=1, stopped=1)`
+    """
+    resp = await make_api_request(ops_test, endpoint="/connectors?expand=status")
+
+    connector_states = [i["status"]["connector"]["state"] for i in resp.json().values()]
+
+    for state in ("RUNNING", "FAILED", "STOPPED", "PAUSED"):
+        if state.lower() in kwargs:
+            count = kwargs[state.lower()]
+            logging.info(f'Assert {count} connector(s) are in "{state}" state.')
+            assert len([i for i in connector_states if i == state]) == count

@@ -12,6 +12,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
     IntegrationRequestedEvent,
     KafkaConnectProviderEventHandlers,
 )
+from charms.kafka_connect.v0.integrator import TaskStatus
 from ops.charm import (
     RelationBrokenEvent,
     RelationChangedEvent,
@@ -109,6 +110,13 @@ class ConnectProvider(Object):
         username = f"relation-{event.relation.id}"
         self.charm.auth_manager.remove_user(username)
         self.charm.connect_manager.remove_plugin(path_prefix=username)
+
+        if self.charm.unit.is_leader():
+            self.charm.connect_manager.stop_connector(event.relation.id)
+
+        if self.charm.connect_manager.connector_status(event.relation.id) == TaskStatus.RUNNING:
+            event.defer()
+            return
 
         self.context.worker_unit.should_restart = True
         self.charm.on.config_changed.emit()

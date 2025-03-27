@@ -149,7 +149,9 @@ def test_upgrade_sets_failed_if_failed_upgrade_check(
     assert patch_set_failed.call_count
 
 
-def test_upgrade_succeeds(ctx: Context, base_state: State, upgrade_func: str) -> None:
+def test_upgrade_succeeds(
+    ctx: Context, base_state: State, upgrade_func: str, active_service
+) -> None:
     # Given
     state_in = base_state
 
@@ -159,7 +161,6 @@ def test_upgrade_succeeds(ctx: Context, base_state: State, upgrade_func: str) ->
         patch("workload.Workload.start") as patched_start,
         patch("workload.Workload.stop"),
         patch("workload.Workload.install"),
-        patch("managers.connect.ConnectManager.health_check", return_value=True),
         patch("core.models.Context.ready", return_value=True),
         patch(
             "events.upgrade.ConnectUpgrade.set_unit_completed",
@@ -176,7 +177,7 @@ def test_upgrade_succeeds(ctx: Context, base_state: State, upgrade_func: str) ->
 
 @pytest.mark.skipif(SUBSTRATE == "k8s", reason="Upgrade granted not used on K8s charms")
 def test_upgrade_granted_recurses_upgrade_changed_on_leader(
-    ctx: Context, base_state: State
+    ctx: Context, base_state: State, active_service
 ) -> None:
     # Given
     state_in = base_state
@@ -187,7 +188,6 @@ def test_upgrade_granted_recurses_upgrade_changed_on_leader(
         patch("workload.Workload.start"),
         patch("workload.Workload.stop"),
         patch("workload.Workload.install"),
-        patch("managers.connect.ConnectManager.health_check", return_value=True),
         patch("core.models.Context.ready", return_value=True),
         patch(
             "events.upgrade.ConnectUpgrade.on_upgrade_changed", autospec=True
