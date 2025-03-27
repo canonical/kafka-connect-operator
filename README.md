@@ -15,7 +15,7 @@ This operator can be found on [Charmhub](https://charmhub.io/kafka-connect) and 
 - Seamless integration with Charmed Apache Kafka set of operators
 - Seamless integration with an ecosystem of of Integrator charms supporting common ETL tasks on different database technologies offered by [Canonical Data Platform](https://canonical.com/data).
 
-The Apache Kafka Connect Operator uses the latest Apache Kafka release, made available using the [*charmed-kafka* snap](https://github.com/canonical/charmed-kafka-snap) distributed by Canonical.
+The Charmed Kafka Connect Operator uses the latest [`charmed-kafka` snap](https://github.com/canonical/charmed-kafka-snap) containing Apache Kafka distributed by Canonical.
 
 Since Kafka Connect requires a running Apache Kafka cluster, this charmed operator makes use of the [Charmed Apache Kafka](https://github.com/canonical/kafka-operator) in order to function.
 
