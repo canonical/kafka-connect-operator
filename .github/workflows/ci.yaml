@@ -67,6 +67,7 @@ jobs:
           - integration-provider
           - integration-upgrade
           - integration-requirer
+          - integration-scaling
 
     name: ${{ matrix.tox-environments }}
     needs:
