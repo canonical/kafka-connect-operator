@@ -2,9 +2,14 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import contextlib
+import http.server
 import json
 import logging
+import os
+import ssl
 import subprocess
+from multiprocessing import Process
 from typing import Mapping
 from unittest.mock import MagicMock
 
@@ -27,6 +32,7 @@ UNIT_NAME = "kafka-connect/0"
 INTERNAL_ADDRESS = "10.10.10.10"
 BIND_ADDRESS = "10.20.20.20"
 KEYTOOL = "keytool"
+JKS_UNIT_TEST_FILE = "tests/unit/TestJKS.java"
 
 
 def _exec(
@@ -58,9 +64,42 @@ def _exec(
 
 try:
     _exec(KEYTOOL)
-    KEYTOOL_EXISTS = True
+    _exec("java -version")
+    JAVA_TESTS_DISABLED = False
 except subprocess.CalledProcessError:
-    KEYTOOL_EXISTS = False
+    JAVA_TESTS_DISABLED = True
+
+
+@contextlib.contextmanager
+def simple_ssl_server(certfile: str, keyfile: str, port: int = 10443):
+    httpd = http.server.HTTPServer(("127.0.0.1", port), http.server.SimpleHTTPRequestHandler)
+    ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
+    httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+
+    process = Process(target=httpd.serve_forever)
+    process.start()
+    yield
+
+    process.kill()
+
+
+class JKSError(Exception):
+    """Error raised when JKS unit test fails."""
+
+
+def java_jks_test(truststore_path: str, truststor_password: str, ssl_server_port: int = 10443):
+    cmd = [
+        "java",
+        "-Djavax.net.debug=ssl:handshake",
+        f"-Djavax.net.ssl.trustStore={truststore_path}",
+        f'-Djavax.net.ssl.trustStorePassword="{truststor_password}"',
+        JKS_UNIT_TEST_FILE,
+        f"https://localhost:{ssl_server_port}",
+    ]
+
+    if os.system(" ".join(cmd)):
+        raise JKSError("JKS unit test failed, Check logs for details.")
 
 
 @pytest.fixture()
@@ -112,7 +151,9 @@ def tls_manager(tmp_path_factory):
     yield mgr
 
 
-@pytest.mark.skipif(not KEYTOOL_EXISTS, reason=f"Can't locate {KEYTOOL} in the test environment.")
+@pytest.mark.skipif(
+    JAVA_TESTS_DISABLED, reason=f"Can't locate {KEYTOOL} and/or java in the test environment."
+)
 @pytest.mark.parametrize(
     "tls_initialized", [False, True], ids=["TLS NOT initialized", "TLS initialized"]
 )
@@ -124,8 +165,9 @@ def test_lifecycle(
     caplog: pytest.LogCaptureFixture,
     tls_initialized: bool,
     with_intermediate_ca: bool,
+    tmp_path_factory,
 ) -> None:
-    """..."""
+    """Tests the lifecycle of adding/removing certs from Java and TLSManager points of view."""
     if not tls_initialized:
         tls_manager.tls_context.relation_data = {}
         tls_manager.context.peer_workers.relation_data = {"tls": ""}
@@ -145,23 +187,63 @@ def test_lifecycle(
         return
 
     # build another cert
-    ca_key = generate_private_key()
-    ca = generate_ca(private_key=ca_key, subject="SOME-CA")
-    csr = generate_csr(private_key=generate_private_key(), subject="some-app/0")
-    cert = generate_certificate(csr, ca, ca_key)
-
-    # check import cert functionality
-    tls_manager.import_cert(
-        alias="some-app", filename="some-app", cert_content=cert.decode("utf-8")
+    app_ca_key = generate_private_key()
+    app_ca = generate_ca(private_key=app_ca_key, subject="SOME-CA")
+    app_key = generate_private_key()
+    csr = generate_csr(
+        app_key, subject="some-app/0", sans_dns=["localhost"], sans_ip=["127.0.0.1"]
     )
-    # import again with the same alias
-    tls_manager.import_cert(
-        alias="some-app", filename="other-file", cert_content=cert.decode("utf-8")
-    )
+    app_cert = generate_certificate(csr, app_ca, app_ca_key)
 
-    # check remove cert functionality
-    tls_manager.remove_cert("some-app")
+    tmp_dir = tmp_path_factory.mktemp("someapp")
+    app_certfile = f"{tmp_dir}/app.pem"
+    app_keyfile = f"{tmp_dir}/app.key"
 
+    open(app_certfile, "w").write(app_cert.decode("utf-8"))
+    open(app_keyfile, "w").write(app_key.decode("utf-8"))
+
+    with simple_ssl_server(certfile=app_certfile, keyfile=app_keyfile):
+        # since we don't have the app cert/ca in our truststore, JKS test should fail.
+        with pytest.raises(JKSError):
+            java_jks_test(
+                tls_manager.workload.paths.truststore, tls_manager.tls_context.truststore_password
+            )
+
+        # Add the app cert
+        tls_manager.import_cert(
+            alias="some-app", filename="some-app", cert_content=app_cert.decode("utf-8")
+        )
+
+        # now the test should pass
+        java_jks_test(
+            tls_manager.workload.paths.truststore, tls_manager.tls_context.truststore_password
+        )
+
+        # import again with the same alias
+        tls_manager.import_cert(
+            alias="some-app", filename="other-file", cert_content=app_cert.decode("utf-8")
+        )
+
+        # check remove cert functionality
+        tls_manager.remove_cert("some-app")
+
+        # We don't have the cert anymore, so the JKS test should fail again.
+        with pytest.raises(JKSError):
+            java_jks_test(
+                tls_manager.workload.paths.truststore, tls_manager.tls_context.truststore_password
+            )
+
+        # Now add the app's CA cert instead of its own cert
+        tls_manager.import_cert(
+            alias="some-app-ca", filename="some-app-ca", cert_content=app_ca.decode("utf-8")
+        )
+
+        # the test should pass again
+        java_jks_test(
+            tls_manager.workload.paths.truststore, tls_manager.tls_context.truststore_password
+        )
+
+    # remove some non-existing alias.
     tls_manager.remove_cert("other-app")
     log_record = caplog.records[-1]
     assert "alias <other-app> does not exist" in log_record.msg.lower()
@@ -183,7 +265,7 @@ def test_lifecycle(
 
 
 def test_simulate_os_errors(tls_manager: TLSManager):
-    """..."""
+    """Checks TLSManager functionality when random OS Errors happen."""
 
     def _erroneous_hook(*args, **kwargs):
         raise subprocess.CalledProcessError(
