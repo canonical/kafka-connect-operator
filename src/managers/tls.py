@@ -121,7 +121,7 @@ class TLSManager:
 
     def set_truststore(self) -> None:
         """Adds CA to JKS truststore."""
-        trust_aliases = [f"bundle{i}" for i in range(len(self.tls_context.bundle))] + ["ca"]
+        trust_aliases = [f"bundle{i}" for i in range(len(self.tls_context.chain))] + ["ca"]
 
         for alias in trust_aliases:
             self.import_cert(alias, f"{alias}.pem")
@@ -145,7 +145,7 @@ class TLSManager:
         """Add a certificate to the truststore."""
         if cert_content:
             self.workload.write(
-                content=cert_content, path=f"{self.workload.paths.config_dir}/{filename}.pem"
+                content=cert_content, path=f"{self.workload.paths.config_dir}/{filename}"
             )
 
         command = f"{self.keytool} -import -v -alias {alias} -file {filename} -keystore {self.workload.paths.truststore} -storepass {self.tls_context.truststore_password} -noprompt"
