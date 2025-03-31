@@ -55,7 +55,7 @@ class ConnectApiError(Exception):
 IntegratorMode = Literal["source", "sink"]
 
 # Used on MirrorMaker, the integrator needs to spawn 3 tasks per relation
-MULTITASK_PREFIX = "task_"
+MULTITASK_PREFIX = "mirror-"
 
 
 class TaskStatus(str, Enum):
