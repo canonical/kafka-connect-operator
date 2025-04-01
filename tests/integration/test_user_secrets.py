@@ -23,7 +23,7 @@ CUSTOM_AUTH = {"admin": "adminpass", "user1": "user1pass", "user2": "user2pass"}
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
-    """Deploys kafka-connect charm along kafka (in KRaft mode) & MySQL."""
+    """Deploys kafka-connect charm along kafka (in KRaft mode)."""
     await asyncio.gather(
         ops_test.model.deploy(
             kafka_connect_charm,
@@ -141,6 +141,6 @@ async def test_remove_admin_user_is_safe(ops_test: OpsTest):
 
     for unit in ops_test.model.applications[APP_NAME].units:
         # If we don't provide `custom_auth` argument, `make_connect_api_request` will read
-        # admin credentials from passwords file on the unit
+        # admin credentials from passwords file on the unit.
         response = await make_connect_api_request(ops_test, unit=unit)
         assert response.status_code == 200

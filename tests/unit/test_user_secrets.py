@@ -83,5 +83,3 @@ def test_remove_credentials(
     # since no secret is defined, we expect only admin user to remain
     assert len(charm.auth_manager.credentials) == 1
     assert charm.context.peer_workers.ADMIN_USERNAME in charm.auth_manager.credentials
-    # import pdb
-    # pdb.set_trace()
