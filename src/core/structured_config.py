@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 class CharmConfig(BaseConfigModel):
     """Manager for the structured configuration."""
 
+    auth: str | None = None
     exactly_once_source_support: bool
     key_converter: str
     log_level: LogLevel

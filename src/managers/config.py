@@ -38,6 +38,7 @@ value.converter.schemas.enable=false
 """
 
 PROPERTIES_BLACKLIST = [
+    "auth",
     "log_level",
     "profile",
     "rest_port",
