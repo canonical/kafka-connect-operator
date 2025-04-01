@@ -59,7 +59,7 @@ class SecretsHandler(Object):
             u
             for u in saved_state
             if u not in credentials
-            # and u != self.context.peer_workers.ADMIN_USERNAME
+            and u != self.context.peer_workers.ADMIN_USERNAME
             and not u.startswith("relation-")
         }
 
