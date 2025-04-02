@@ -12,7 +12,7 @@ The flow for defining secrets and granting access to the charm would be as below
     juju add-secret my-auth admin=goodpass user1=somepass user2=otherpass
     # secret:cvh7kruupa1s46bqvuig
     juju grant-secret my-auth kafka-connect
-    juju config kafka-connect auth=secret:cvh7kruupa1s46bqvuig
+    juju config kafka-connect system-users=secret:cvh7kruupa1s46bqvuig
 
 And the update flow would be as simple as:
 
@@ -88,7 +88,7 @@ class SecretsHandler(Object):
 
     def load_auth_secret(self) -> dict[str, str]:
         """Loads user-defined credentials from the secrets."""
-        if not (secret_id := self.charm.config.auth):
+        if not (secret_id := self.charm.config.system_users):
             return {}
 
         try:

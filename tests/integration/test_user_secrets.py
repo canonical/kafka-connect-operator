@@ -15,7 +15,7 @@ from literals import PLUGIN_RESOURCE_KEY
 
 logger = logging.getLogger(__name__)
 
-AUTH_SECRET_CONFIG_KEY = "auth"
+AUTH_SECRET_CONFIG_KEY = "system-users"
 TEST_SECRET_NAME = "test-secret"
 CUSTOM_AUTH = {"admin": "adminpass", "user1": "user1pass", "user2": "user2pass"}
 

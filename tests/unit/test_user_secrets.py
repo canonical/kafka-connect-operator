@@ -9,6 +9,7 @@ from src.charm import ConnectCharm
 from src.literals import KAFKA_CLIENT_REL, PEER_REL
 
 logger = logging.getLogger(__name__)
+AUTH_CONFIG_KEY = "system-users"
 
 
 @pytest.mark.parametrize("secret_id", ["", "auth_secret", "wrong_secret_name"])
@@ -26,7 +27,7 @@ def test_set_credentials(
         base_state,
         relations=[kafka_rel, peer_rel],
         secrets=[auth_secret],
-        config={"auth": secret_id},
+        config={AUTH_CONFIG_KEY: secret_id},
     )
 
     with (
@@ -66,7 +67,6 @@ def test_remove_credentials(
         base_state,
         relations=[kafka_rel, peer_rel],
         secrets=[auth_secret],
-        # config={"auth": secret_id}
     )
 
     with (ctx(ctx.on.update_status(), state_in) as mgr,):

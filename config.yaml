@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 options:
-  auth:
+  system-users:
     description: |
       User-provided secret ID which defines custom username/passwords on the Kafka Connect
       REST Interface. The secret ID format is like "secret:cvh7kruupa1s46bqvuig" and should
@@ -17,7 +17,7 @@ options:
         $ juju add-secret my-auth admin=adminpass user1=user1pass user2=user2pass
         # some ID will be printed: e.g. "secret:cvh7kruupa1s46bqvuig". take note of that.
         $ juju grant-secret my-auth kafka-connect
-        $ juju config kafka-connect auth=secret:cvh7kruupa1s46bqvuig
+        $ juju config kafka-connect system-users=secret:cvh7kruupa1s46bqvuig
     type: string
   exactly_once_source_support:
     description: |
