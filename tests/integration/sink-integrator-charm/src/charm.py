@@ -62,6 +62,8 @@ class TestIntegratorCharm(CharmBase):
         if not self.integrator.server.health_check():
             self.on.start.emit()
 
+        self.integrator.maybe_resume_connector()
+
     def _on_config_changed(self, _) -> None:
         """Handler for `config-changed` event."""
         resource_path = None

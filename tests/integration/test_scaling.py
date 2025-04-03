@@ -146,9 +146,11 @@ async def test_destroy_active_workers(ops_test: OpsTest):
             )
 
     async with ops_test.fast_forward(fast_interval="30s"):
-        await asyncio.sleep(120)
-
-    assert "RUNNING" in ops_test.model.applications[INTEGRATOR].status_message
+        await ops_test.model.block_until(
+            lambda: "RUNNING" in ops_test.model.applications[INTEGRATOR].status_message,
+            timeout=600,
+            wait_period=15,
+        )
 
     status_resp = await make_connect_api_request(ops_test, endpoint="connectors?expand=status")
     remaining_unit = ops_test.model.applications[APP_NAME].units[0]
