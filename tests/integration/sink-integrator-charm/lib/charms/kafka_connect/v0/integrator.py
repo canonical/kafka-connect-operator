@@ -396,9 +396,13 @@ class ConnectClient:
 
     def connector_status(self) -> TaskStatus:
         """Returns the connector status."""
-        response = self.request(
-            method="GET", api=f"connectors/{self.connector_name}/status", timeout=10
-        )
+        try:
+            response = self.request(
+                method="GET", api=f"connectors/{self.connector_name}/status", timeout=10
+            )
+        except ConnectApiError as e:
+            logger.error(e)
+            return TaskStatus.UNKNOWN
 
         if response.status_code not in (200, 404):
             logger.error(f"Unable to fetch connector status, details: {response.content}")
