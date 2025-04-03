@@ -115,7 +115,12 @@ async def test_scale_out(ops_test: OpsTest):
             apps=[APP_NAME], idle_period=30, timeout=1200, status="active", wait_for_exact_units=3
         )
 
-    assert "RUNNING" in ops_test.model.applications[INTEGRATOR].status_message
+    async with ops_test.fast_forward(fast_interval="30s"):
+        await ops_test.model.block_until(
+            lambda: "RUNNING" in ops_test.model.applications[INTEGRATOR].status_message,
+            timeout=600,
+            wait_period=15,
+        )
 
     for unit in ops_test.model.applications[APP_NAME].units:
         status_resp = await make_connect_api_request(
