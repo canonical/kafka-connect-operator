@@ -334,6 +334,20 @@ class ConnectClient:
         logger.error(response.content)
         raise ConnectApiError(f"Unable to start the connector, details: {response.content}")
 
+    def resume_connector(self) -> None:
+        """Resums a connector task by PUTting to the `connectors/<CONNECTOR-NAME>/resume` endpoint.
+
+        Raises:
+            ConnectApiError: If unsuccessful.
+        """
+        response = self.request(method="PUT", api=f"connectors/{self.connector_name}/resume")
+
+        if response.status_code == 202:
+            return
+
+        logger.error(response.content)
+        raise ConnectApiError(f"Unable to resume the connector, details: {response.content}")
+
     def stop_connector(self) -> None:
         """Stops a connector by making a request to connectors/CONNECTOR-NAME/stop endpoint.
 
@@ -346,7 +360,7 @@ class ConnectClient:
             raise ConnectApiError(f"Unable to stop the connector, details: {response.content}")
 
     def task_status(self) -> TaskStatus:
-        """Returns the connector/task status."""
+        """Returns the task(s) status of a connector."""
         response = self.request(
             method="GET", api=f"connectors/{self.connector_name}/tasks", timeout=10
         )
@@ -378,6 +392,24 @@ class ConnectClient:
             return TaskStatus.UNKNOWN
 
         state = status_response.json().get("state", "UNASSIGNED")
+        return TaskStatus(state)
+
+    def connector_status(self) -> TaskStatus:
+        """Returns the connector status."""
+        response = self.request(
+            method="GET", api=f"connectors/{self.connector_name}/status", timeout=10
+        )
+
+        if response.status_code not in (200, 404):
+            logger.error(f"Unable to fetch connector status, details: {response.content}")
+            return TaskStatus.UNKNOWN
+
+        if response.status_code == 404:
+            return TaskStatus.UNASSIGNED
+
+        status_response = response.json()
+
+        state = status_response.get("connector", {}).get("state", "UNASSIGNED")
         return TaskStatus(state)
 
 
@@ -573,7 +605,7 @@ class BaseIntegrator(ABC, Object):
         )
 
     def start_connector(self) -> None:
-        """Starts the connector task."""
+        """Starts the connector."""
         if self.started:
             logger.info("Connector task has already started")
             return
@@ -590,6 +622,17 @@ class BaseIntegrator(ABC, Object):
 
         self.started = True
 
+    def maybe_resume_connector(self) -> None:
+        """Restarts/resumes the connector if it's in STOPPED state."""
+        if self.connector_status != TaskStatus.STOPPED:
+            return
+
+        try:
+            self._client.resume_connector()
+        except ConnectApiError as e:
+            logger.error(f"Unable to restart the connector, details: {e}")
+            return
+
     @property
     def task_status(self) -> TaskStatus:
         """Returns connector task status."""
@@ -597,6 +640,11 @@ class BaseIntegrator(ABC, Object):
             return TaskStatus.UNASSIGNED
 
         return self._client.task_status()
+
+    @property
+    def connector_status(self) -> TaskStatus:
+        """Returns connector status."""
+        return self._client.connector_status()
 
     # Abstract methods
 
