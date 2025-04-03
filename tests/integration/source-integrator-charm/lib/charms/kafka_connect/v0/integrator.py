@@ -335,7 +335,7 @@ class ConnectClient:
         raise ConnectApiError(f"Unable to start the connector, details: {response.content}")
 
     def resume_connector(self) -> None:
-        """Resums a connector task by PUTting to the `connectors/<CONNECTOR-NAME>/resume` endpoint.
+        """Resumes a connector task by PUTting to the `connectors/<CONNECTOR-NAME>/resume` endpoint.
 
         Raises:
             ConnectApiError: If unsuccessful.
