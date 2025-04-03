@@ -92,7 +92,7 @@ class TestIntegratorCharm(CharmBase):
             return
 
         try:
-            event.add_status(ActiveStatus(self.integrator.task_status))
+            event.add_status(ActiveStatus(self.integrator.connector_status))
         except Exception as e:
             logger.error(e)
             event.add_status(
