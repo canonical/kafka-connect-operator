@@ -11,6 +11,7 @@ from helpers import (
     MYSQL_APP,
     MYSQL_CHANNEL,
     DatabaseFixtureParams,
+    destroy_active_workers,
     download_file,
     get_unit_ipv4_address,
     make_connect_api_request,
@@ -26,21 +27,6 @@ MYSQL_DB = "test_db"
 INTEGRATOR = "integrator"
 
 
-async def destroy_active_workers(ops_test: OpsTest):
-    """Finds the unit with active connector task(s) and destroys it."""
-    status_resp = await make_connect_api_request(ops_test, endpoint="connectors?expand=status")
-
-    workers = {
-        item["status"]["connector"]["worker_id"].split(":")[0]
-        for item in status_resp.json().values()
-    }
-
-    for unit in ops_test.model.applications[APP_NAME].units:
-        if await get_unit_ipv4_address(ops_test, unit) in workers:
-            logger.info(f"Destroying {unit}")
-            await ops_test.model.applications[APP_NAME].destroy_units(unit.name)
-
-
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
@@ -50,7 +36,7 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
             kafka_connect_charm,
             application_name=APP_NAME,
             resources={PLUGIN_RESOURCE_KEY: "./tests/integration/resources/FakeResource.tar"},
-            num_units=3,
+            num_units=1,
             series="jammy",
             # config={"profile": "testing"},
         ),
@@ -121,6 +107,27 @@ async def test_load_data(ops_test: OpsTest, mysql_test_data):
     assert "RUNNING" in ops_test.model.applications[INTEGRATOR].status_message
 
 
+@pytest.mark.abort_on_fail
+async def test_scale_out(ops_test: OpsTest):
+    await ops_test.model.applications[APP_NAME].add_units(count=2)
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[APP_NAME], idle_period=30, timeout=1200, status="active", wait_for_exact_units=3
+        )
+
+    assert "RUNNING" in ops_test.model.applications[INTEGRATOR].status_message
+
+    for unit in ops_test.model.applications[APP_NAME].units:
+        status_resp = await make_connect_api_request(
+            ops_test, unit=unit, endpoint="connectors?expand=status"
+        )
+        assert status_resp.status_code == 200
+        status_json = status_resp.json()
+        for connector in status_json:
+            assert status_json[connector]["status"]["connector"]["state"] == "RUNNING"
+
+
+@pytest.mark.abort_on_fail
 async def test_destroy_active_workers(ops_test: OpsTest):
     """Checks scaling in functionality by destroying workers with active connectors.
 
