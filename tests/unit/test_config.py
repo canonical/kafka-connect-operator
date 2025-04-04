@@ -83,8 +83,15 @@ def test_defaults(ctx: Context, base_state: State) -> None:
         ),
         ConfigOverride(key="profile", values=["testing", "production"]),
         ConfigOverride(key="profile", values=["unknown", "test", None, 123, True], valid=False),
-        ConfigOverride(key="system_users", values=["secret:cvnrnmmupa1s432t4sbg", "secret:cvnrk4uupa1s432t4sag"]),
-        ConfigOverride(key="system_users", values=["cvnrnmmupa1s432t4sbg", "some-text", "my-secret"], valid=False),
+        ConfigOverride(
+            key="system_users",
+            values=["secret:cvnrnmmupa1s432t4sbg", "secret:cvnrk4uupa1s432t4sag"],
+        ),
+        ConfigOverride(
+            key="system_users",
+            values=["cvnrnmmupa1s432t4sbg", "some-text", "my-secret"],
+            valid=False,
+        ),
     ],
     ids=lambda override: f"{override}",
 )
