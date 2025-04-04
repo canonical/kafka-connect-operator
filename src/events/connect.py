@@ -40,7 +40,6 @@ class ConnectHandler(Object):
 
         # instantiate the provider
         self.provider = ConnectProvider(self.charm)
-        self.framework.observe(self.charm.on[PEER_REL].relation_changed, self._on_config_changed)
 
     def _update_status(self, event: EventBase) -> None:
         """Handler for `update-status` event."""

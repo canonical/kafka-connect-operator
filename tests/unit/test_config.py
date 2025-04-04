@@ -83,12 +83,21 @@ def test_defaults(ctx: Context, base_state: State) -> None:
         ),
         ConfigOverride(key="profile", values=["testing", "production"]),
         ConfigOverride(key="profile", values=["unknown", "test", None, 123, True], valid=False),
+        ConfigOverride(
+            key="system_users",
+            values=["secret:cvnrnmmupa1s432t4sbg", "secret:cvnrk4uupa1s432t4sag"],
+        ),
+        ConfigOverride(
+            key="system_users",
+            values=["cvnrnmmupa1s432t4sbg", "some-text", "my-secret"],
+            valid=False,
+        ),
     ],
     ids=lambda override: f"{override}",
 )
 def test_validator(override: ConfigOverride) -> None:
     """Tests `CharmConfig` validator functionality."""
-    defaults = {k: v["default"] for k, v in CONFIG["options"].items()}
+    defaults = {k: v["default"] for k, v in CONFIG["options"].items() if "default" in v}
 
     for value in override.values:
         target_config = defaults | {override.key: value}
@@ -103,7 +112,7 @@ def test_validator(override: ConfigOverride) -> None:
 
 def test_empty_string_validator() -> None:
     """Checks empty string will be converted to None and raise a ValidationError."""
-    defaults = {k: v["default"] for k, v in CONFIG["options"].items()}
+    defaults = {k: v["default"] for k, v in CONFIG["options"].items() if "default" in v}
 
     with pytest.raises(ValidationError):
         _ = CharmConfig(**defaults | {"key_converter": ""})

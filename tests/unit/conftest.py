@@ -10,6 +10,7 @@ import pytest
 import yaml
 from ops.testing import Container, Context, Resource, State
 from src.charm import ConnectCharm
+from src.core.workload import Paths
 from src.literals import CONTAINER, PLUGIN_RESOURCE_KEY, SNAP_NAME, SUBSTRATE
 
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
@@ -34,21 +35,32 @@ def ctx() -> Context:
 
 
 @pytest.fixture(autouse=True)
-def patched_workload_write():
-    with patch("workload.Workload.write") as workload_write:
-        yield workload_write
+def workload(monkeypatch):
+    """Workload with completely mocked functionality."""
+    monkeypatch.setattr("workload.Workload.exec", Mock())
+    monkeypatch.setattr("workload.Workload.installed", True)
+    monkeypatch.setattr("workload.Workload.write", Mock())
+    yield
 
 
-@pytest.fixture(autouse=True)
-def patched_exec():
-    with patch("workload.Workload.exec") as patched_exec:
-        yield patched_exec
+@pytest.fixture()
+def workload_with_io(monkeypatch, tmp_path_factory):
+    """Workload with simulated read/write functionality using temp paths."""
+    # undo previous autouse monkeypatches on workload
+    monkeypatch.undo()
 
+    class TmpPaths(Paths):
+        logs_dir = tmp_path_factory.mktemp("logs")
+        snap_dir = tmp_path_factory.mktemp("snap")
+        env = tmp_path_factory.mktemp("etc") / "environment"
+        plugins = tmp_path_factory.mktemp("plugins")
 
-@pytest.fixture(autouse=True)
-def active_workload():
-    with patch("workload.Workload.installed") as active_workload:
-        yield active_workload
+    paths = TmpPaths(config_dir=tmp_path_factory.mktemp("config"))
+
+    monkeypatch.setattr("workload.Workload.exec", Mock())
+    monkeypatch.setattr("workload.Workload.installed", True)
+    monkeypatch.setattr("workload.Workload.paths", paths)
+    yield
 
 
 @pytest.fixture(autouse=True)

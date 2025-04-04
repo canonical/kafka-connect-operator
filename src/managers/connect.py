@@ -185,6 +185,10 @@ class ConnectManager:
 
     def load_plugin(self, resource_path: Path, path_prefix: str = "") -> None:
         """Loads a plugin from a given `resource_path` to the `PLUGIN_PATH` folder, skips if previously loaded."""
+        if not resource_path.exists():
+            logger.info(f"Plugin not yet loaded to {resource_path.name}.")
+            return
+
         if SUBSTRATE == "k8s":
             # we should push the plugin to kafka connect container first.
             tmp_dir = tempfile.mkdtemp()
