@@ -303,3 +303,18 @@ async def assert_connector_statuses(ops_test: OpsTest, **kwargs: int):
             count = kwargs[state.lower()]
             logging.info(f'Assert {count} connector(s) are in "{state}" state.')
             assert len([i for i in connector_states if i == state]) == count
+
+
+async def destroy_active_workers(ops_test: OpsTest):
+    """Finds unit(s) with active connector task(s) and destroys it(them)."""
+    status_resp = await make_connect_api_request(ops_test, endpoint="connectors?expand=status")
+
+    workers = {
+        item["status"]["connector"]["worker_id"].split(":")[0]
+        for item in status_resp.json().values()
+    }
+
+    for unit in ops_test.model.applications[APP_NAME].units:
+        if await get_unit_ipv4_address(ops_test, unit) in workers:
+            logger.info(f"Destroying {unit}")
+            await ops_test.model.applications[APP_NAME].destroy_units(unit.name)

@@ -109,7 +109,7 @@ async def test_activate_source_integrator(ops_test: OpsTest):
         )
 
     assert ops_test.model.applications[MYSQL_INTEGRATOR].status == "active"
-    assert "UNASSIGNED" in ops_test.model.applications[MYSQL_INTEGRATOR].status_message
+    assert "UNKNOWN" in ops_test.model.applications[MYSQL_INTEGRATOR].status_message
 
 
 @pytest.mark.abort_on_fail
@@ -173,7 +173,7 @@ async def test_activate_sink_integrator(ops_test: OpsTest):
         )
 
     assert ops_test.model.applications[POSTGRES_INTEGRATOR].status == "active"
-    assert "UNASSIGNED" in ops_test.model.applications[POSTGRES_INTEGRATOR].status_message
+    assert "UNKNOWN" in ops_test.model.applications[POSTGRES_INTEGRATOR].status_message
 
 
 @pytest.mark.abort_on_fail
