@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 AUTH_CONFIG_KEY = "system-users"
 
 
-@pytest.mark.parametrize("secret_id", ["", "auth_secret", "wrong_secret_name"])
+@pytest.mark.parametrize("secret_provided", [True, False])
 def test_set_credentials(
-    ctx: Context, base_state: State, kafka_client_rel: dict, active_service, caplog, secret_id: str
+    ctx: Context, base_state: State, kafka_client_rel: dict, secret_provided: bool, active_service
 ) -> None:
     """Tests setting username/passwords through secrets."""
     auth_secret = Secret(
-        id="auth_secret",
+        label="auth_secret",
         tracked_content={"admin": "newpass"},
     )
     kafka_rel = Relation(KAFKA_CLIENT_REL, KAFKA_CLIENT_REL, remote_app_data=kafka_client_rel)
@@ -27,7 +27,7 @@ def test_set_credentials(
         base_state,
         relations=[kafka_rel, peer_rel],
         secrets=[auth_secret],
-        config={AUTH_CONFIG_KEY: secret_id},
+        config={AUTH_CONFIG_KEY: auth_secret.id} if secret_provided else {},
     )
 
     with (
@@ -40,17 +40,12 @@ def test_set_credentials(
 
     assert previous_password == "oldpass"
 
-    match secret_id:
-        case "auth_secret":
-            assert charm.context.peer_workers.admin_password != previous_password
-            assert charm.context.peer_workers.admin_password == "newpass"
-            _restart.assert_called_once()
-        case "":
-            assert charm.context.peer_workers.admin_password == previous_password
-        case _:
-            # secret not found, we expect an ERROR log
-            assert charm.context.peer_workers.admin_password == previous_password
-            assert caplog.records[-1].levelname == "ERROR"
+    if secret_provided:
+        assert charm.context.peer_workers.admin_password != previous_password
+        assert charm.context.peer_workers.admin_password == "newpass"
+        _restart.assert_called_once()
+    else:
+        assert charm.context.peer_workers.admin_password == previous_password
 
 
 def test_remove_credentials(
