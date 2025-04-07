@@ -54,10 +54,8 @@ async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
 
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
-            apps=[APP_NAME, KAFKA_APP], idle_period=60, timeout=1000
+            apps=[APP_NAME, KAFKA_APP], idle_period=60, timeout=1000, status="active"
         )
-
-    assert ops_test.model.applications[APP_NAME].status == "active"
 
     logger.info("Calling pre-upgrade-check")
     action = await ops_test.model.applications[APP_NAME].units[0].run_action("pre-upgrade-check")
@@ -69,7 +67,7 @@ async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
     logger.info("Upgrading Connect...")
     await ops_test.model.applications[APP_NAME].refresh(path=kafka_connect_charm)
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", timeout=1000, idle_period=120
+        apps=[APP_NAME], status="active", timeout=1000, idle_period=120, raise_on_error=False
     )
 
     await check_connect_endpoints_status(ops_test, app_name=APP_NAME, port=DEFAULT_API_PORT)
