@@ -9,14 +9,14 @@ logger = logging.getLogger(__name__)
 
 
 def test_config_changed_hook_with_no_resource(
-    ctx: Context, base_state: State, kafka_client_rel, active_service
+    ctx: Context, base_state: State, kafka_client_rel, active_service, restart_rel
 ) -> None:
     """Checks `config_changed` hook without any resources being attached works."""
     # Given
     state_in = base_state
     kafka_rel = Relation(KAFKA_CLIENT_REL, KAFKA_CLIENT_REL, remote_app_data=kafka_client_rel)
 
-    state_in = dataclasses.replace(base_state, relations=[kafka_rel])
+    state_in = dataclasses.replace(base_state, relations=[kafka_rel, restart_rel])
 
     # When
     state_out = ctx.run(ctx.on.config_changed(), state_in)
