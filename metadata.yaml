@@ -16,6 +16,8 @@ series:
   - jammy
 
 peers:
+  restart:
+    interface: rolling_op
   worker:
     interface: worker
   upgrade:
