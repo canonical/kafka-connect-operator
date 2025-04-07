@@ -50,6 +50,56 @@ This would trigger a restart of the `kafka-connect` charm. Once all units are sh
 
 There is no limit for the number of plugins that could be added manually. However, for common use-cases of ETL tasks on Data Platform charmed operators we recommend using the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) charm.
 
+### User Management on the REST Interface
+
+Kafka Connect uses a RESTful API for common administrative tasks. By default, Charmed Kafka Connect enforces authentication on the Kafka Connect REST API.
+
+Internal users on the Charmed Kafka Connect application could be managed using [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user). 
+
+The secret data should contain a mapping of `username=password`s and access to the secret should be granted to the Kafka Connect application. Then, the Kafka Connect application should be configured to use the user secret by setting the `system-users` config option.
+
+The complete flow for defining custom credentials on the Charmed Kafka Connect application would be as following: 
+
+```bash
+# add a user secret defining "admin" & "user1" passwords
+juju add-secret mysecret admin=adminpass user1=user1pass
+# You will receive a secret-id in response which looks like: secret:cvh7kruupa1s46bqvuig
+
+# grant access to the secret
+juju grant-secret mysecret kafka-connect
+
+# configure Kafka Connect application to use the provided secret
+juju config kafka-connect system-users=secret:cvh7kruupa1s46bqvuig
+```
+
+To verify that Kafka Connect is properly configured and functioning, you could send a request to the REST interface to list all registered connectors using the password set in Juju secret:
+
+```bash
+curl -u admin:admin_pass -X GET http://<kafka-connect-unit-ip>:8083/connector-plugins
+```
+
+You should get a response like below:
+
+```bash
+[
+  {
+    "class": "org.apache.kafka.connect.mirror.MirrorCheckpointConnector",
+    "type": "source",
+    "version": "3.9.0-ubuntu1"
+  },
+  {
+    "class": "org.apache.kafka.connect.mirror.MirrorHeartbeatConnector",
+    "type": "source",
+    "version": "3.9.0-ubuntu1"
+  },
+  {
+    "class": "org.apache.kafka.connect.mirror.MirrorSourceConnector",
+    "type": "source",
+    "version": "3.9.0-ubuntu1"
+  }
+]
+```
+
 ## Relations
 
 The Charmed Kafka Connect Operator supports Juju [relations](https://juju.is/docs/olm/relations) for interfaces listed below.
