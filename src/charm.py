@@ -133,8 +133,10 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
 
         self.connect_manager.restart_worker()
 
-        while not self.connect_manager.health_check():
-            pass
+        for _ in range(4):
+            # shouldn't take longer than a minute
+            if self.connect_manager.health_check():
+                return
 
     def reconcile(self) -> None:
         """Substrate-agnostic method for startup/restarts/config-changes which orchestrates workload, managers and handlers.
