@@ -724,25 +724,6 @@ class BaseIntegrator(ABC, Object):
             logger.error(f"Unable to restart the connector, details: {e}")
             return
 
-    def stop_connector(self) -> None:
-        """Stops the connector."""
-        if self.connector_names:
-            for connector_name in self.connector_names:
-                    try:
-                        self._client.stop_connector(connector_name)
-                    except ConnectApiError as e:
-                        logger.error(f"Connector stop failed, details: {e}")
-                        return
-        else:
-            try:
-                self._client.stop_connector()
-            except ConnectApiError as e:
-                logger.error(f"Connector stop failed, details: {e}")
-                return
-
-        self.teardown()
-        self.started = False
-
     @property
     def task_status(self) -> TaskStatus:
         """Returns connector task status."""
