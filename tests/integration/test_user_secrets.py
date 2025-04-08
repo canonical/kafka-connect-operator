@@ -11,13 +11,15 @@ from helpers import (
 )
 from pytest_operator.plugin import OpsTest
 
+from core.models import PeerWorkersContext
 from literals import PLUGIN_RESOURCE_KEY
 
 logger = logging.getLogger(__name__)
 
 AUTH_SECRET_CONFIG_KEY = "system-users"
 TEST_SECRET_NAME = "test-secret"
-CUSTOM_AUTH = {"admin": "adminpass", "user1": "user1pass", "user2": "user2pass"}
+INTERNAL_USER = PeerWorkersContext.ADMIN_USERNAME
+CUSTOM_AUTH = {INTERNAL_USER: "adminpass", "user1": "user1pass", "user2": "user2pass"}
 
 
 @pytest.mark.abort_on_fail
@@ -90,7 +92,7 @@ async def test_after_scale_out(ops_test: OpsTest):
             ops_test, unit=unit, custom_auth=(username, password)
         )
         logger.info(f"Testing {username} on {unit.name}: {response.status_code}")
-        assert response.status_code == 200
+        assert response.status_code == 200 if username == INTERNAL_USER else 401
 
 
 async def test_update_secret(ops_test: OpsTest):
@@ -124,7 +126,7 @@ async def test_update_secret(ops_test: OpsTest):
             ops_test, unit=unit, custom_auth=(username, password)
         )
         logger.info(f"Testing {username} on {unit.name}: {response.status_code}")
-        assert response.status_code == 200
+        assert response.status_code == 200 if username == INTERNAL_USER else 401
 
 
 async def test_remove_admin_user_is_safe(ops_test: OpsTest):

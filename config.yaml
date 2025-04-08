@@ -8,13 +8,13 @@ options:
       REST Interface. The secret ID format is like "secret:cvh7kruupa1s46bqvuig" and should
       not be confused with secret name or label.
 
-      The secret could be defined using `juju add-secret <secret-name> u1=p1 u2=p2 ...`
-      command, where keys (u1..n) are usernames and values (p1..n) are passwords.
+      The secret could be defined using `juju add-secret <secret-name> admin=<admin-password>`
+      command, where `admin` is the internal user created by the charm.
       The `juju add-secret` command will output the secret ID, which can then be granted to
       the charm and configured using `juju config` command. The following example 
       shows the complete flow:
 
-        $ juju add-secret my-auth admin=adminpass user1=user1pass user2=user2pass
+        $ juju add-secret my-auth admin=adminpass
         # some ID will be printed: e.g. "secret:cvh7kruupa1s46bqvuig". take note of that.
         $ juju grant-secret my-auth kafka-connect
         $ juju config kafka-connect system-users=secret:cvh7kruupa1s46bqvuig

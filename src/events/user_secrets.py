@@ -9,7 +9,7 @@ and granting their access to the charm.
 
 The flow for defining secrets and granting access to the charm would be as below:
 
-    juju add-secret my-auth admin=goodpass user1=somepass user2=otherpass
+    juju add-secret my-auth admin=goodpass
     # secret:cvh7kruupa1s46bqvuig
     juju grant-secret my-auth kafka-connect
     juju config kafka-connect system-users=secret:cvh7kruupa1s46bqvuig
@@ -17,9 +17,6 @@ The flow for defining secrets and granting access to the charm would be as below
 And the update flow would be as simple as:
 
     juju update-secret my-auth admin=Str0ng_pass
-
-Note that the above command will create a new revision of the secret,
-which implies that `user1` and `user2` are no longer needed and will be removed.
 """
 
 import logging
@@ -61,7 +58,7 @@ class SecretsHandler(Object):
             if u not in credentials
             and u != self.context.peer_workers.ADMIN_USERNAME
             and not u.startswith("relation-")
-        }
+        }  # removed does not have functionality right now, since we only allow internal user.
 
         if not changed and not removed:
             return
@@ -100,7 +97,7 @@ class SecretsHandler(Object):
         creds = {
             username: password
             for username, password in secret_content.items()
-            if not str(username).startswith("relation-")
+            if username == self.context.peer_workers.ADMIN_USERNAME
         }
 
         return creds
