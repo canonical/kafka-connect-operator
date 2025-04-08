@@ -52,6 +52,7 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
         )
 
 
+@pytest.mark.abort_on_fail
 async def test_add_auth_secret(ops_test: OpsTest):
     """Checks the flow for defining custom username/passwords on Kafka Connect REST interface through user-defined secrets."""
     # add secret
@@ -69,9 +70,10 @@ async def test_add_auth_secret(ops_test: OpsTest):
 
     for username, password in CUSTOM_AUTH.items():
         response = await make_connect_api_request(ops_test, custom_auth=(username, password))
-        assert response.status_code == 200
+        assert response.status_code == 200 if username == INTERNAL_USER else 401
 
 
+@pytest.mark.abort_on_fail
 async def test_after_scale_out(ops_test: OpsTest):
     """Checks custom username/passwords would be available on all units after scaling."""
     await ops_test.model.applications[APP_NAME].add_units(count=2)
@@ -95,6 +97,7 @@ async def test_after_scale_out(ops_test: OpsTest):
         assert response.status_code == 200 if username == INTERNAL_USER else 401
 
 
+@pytest.mark.abort_on_fail
 async def test_update_secret(ops_test: OpsTest):
     """Checks `update-secret` functionality."""
     # let's update admin password, remove user1 & user2 and add user3
@@ -129,6 +132,7 @@ async def test_update_secret(ops_test: OpsTest):
         assert response.status_code == 200 if username == INTERNAL_USER else 401
 
 
+@pytest.mark.abort_on_fail
 async def test_remove_admin_user_is_safe(ops_test: OpsTest):
     """Checks removing admin user from the user-defined secret wouldn't affect cluster functionality."""
     secret_id = await ops_test.model.add_secret(name="new-secret", data_args=["user4=user4pass"])
