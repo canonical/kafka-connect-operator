@@ -61,8 +61,8 @@ The secret data should contain a mapping of `username=password`s and access to t
 The complete flow for defining custom credentials on the Charmed Kafka Connect application would be as following: 
 
 ```bash
-# add a user secret defining "admin" & "user1" passwords
-juju add-secret mysecret admin=adminpass user1=user1pass
+# add a user secret defining the internal "admin" user's password
+juju add-secret mysecret admin=adminpass
 # You will receive a secret-id in response which looks like: secret:cvh7kruupa1s46bqvuig
 
 # grant access to the secret
@@ -75,7 +75,7 @@ juju config kafka-connect system-users=secret:cvh7kruupa1s46bqvuig
 To verify that Kafka Connect is properly configured and functioning, you could send a request to the REST interface to list all registered connectors using the password set in Juju secret:
 
 ```bash
-curl -u admin:admin_pass -X GET http://<kafka-connect-unit-ip>:8083/connector-plugins
+curl -u admin:adminpass -X GET http://<kafka-connect-unit-ip>:8083/connector-plugins
 ```
 
 You should get a response like below:
@@ -106,13 +106,13 @@ The Charmed Kafka Connect Operator supports Juju [relations](https://juju.is/doc
 
 #### The `connect_client` interface
 
-The `connect_client` interface is used with any requirer/integrator charm adhering to the `connect-client` charm relation interface. Integrators will automatically handle connectors/tasks lifecycle on Kafka Connect including plugin management, startup, cleanup, and scaling, and simplify common ETL operations on Data Platform line of products.
+The `connect_client` interface is used with any requirer/integrator charm which has the capability of integration with Charmed Kafka Connect and possibly, one or more other [Data Platform charms](https://canonical.com/data). Integrators will automatically handle connectors/tasks lifecycle on Kafka Connect including plugin management, startup, cleanup, and scaling, and simplify common ETL operations on Data Platform line of products.
 
 A curated set of integrators for common ETL use cases within the Canonical Data Platform product line is available in the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) repository. These integrators support use cases such as loading data to and from MySQL, PostgreSQL, OpenSearch, S3-compatible storage services, and active/passive replication of Apache Kafka topics using MirrorMaker.
 
 #### The `tls-certificates` interface
 
-The `tls-certificates` interface could be used with any charm that adheres to [`tls-certifcates`](https://github.com/canonical/charm-relation-interfaces/tree/main/docs/json_schemas/tls_certificates/v1) **provider** charm relation interface. One example is the [`self-signed-certificates`](https://github.com/canonical/self-signed-certificates-operator) operator by Canonical.
+The `tls-certificates` interface could be used with any charm that provides TLS certificate lifecycle management functionality, following [`this specification`](https://github.com/canonical/charm-relation-interfaces/tree/main/docs/json_schemas/tls_certificates/v1). One example is the [`self-signed-certificates`](https://github.com/canonical/self-signed-certificates-operator) operator by Canonical.
 
 Note that TLS can be enabled in three different modes:
 
