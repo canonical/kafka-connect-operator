@@ -58,7 +58,7 @@ class ConnectApiError(Exception):
 IntegratorMode = Literal["source", "sink"]
 
 # Used on MirrorMaker, the integrator needs to spawn 3 connectors per relation
-MULTICONNECTOR_PREFIX = "mirror-"
+MULTICONNECTOR_PREFIX = "mirror"
 
 
 class TaskStatus(str, Enum):
@@ -367,6 +367,26 @@ class ConnectClient:
         if response.status_code != 204:
             raise ConnectApiError(f"Unable to stop the connector, details: {response.content}")
 
+    def patch_connector(
+        self, connector_config: dict, connector_name: str | None = None
+    ) -> None:
+        """Patches a connector by PATCHting `connector_config` to the `connectors/<CONNECTOR-NAME>` endpoint.
+
+        Raises:
+            ConnectApiError: If unsuccessful.
+        """
+        response = self.request(
+            method="PATCH",
+            api=f"connectors/{connector_name or self.connector_name}/config",
+            json=connector_config,
+        )
+
+        if response.status_code == 200:
+            return
+
+        logger.error(response.content)
+        raise ConnectApiError(f"Unable to patch the connector, details: {response.content}")
+
     def task_status(self, connector_name: str | None = None) -> TaskStatus:
         """Returns the task status of a connector."""
         connector_name = connector_name or self.connector_name
@@ -601,24 +621,13 @@ class BaseIntegrator(ABC, Object):
         )
 
     @property
-    def multiple_connectors(self) -> bool:
-        """Figure if there are multiple connectors stored in configuration options."""
-        # TODO
-        return False
-
-    @property
-    def connectors(self) -> list[dict[str, Any]] | None:
-        """List of connectors to be created."""
-        pass
-
-    @property
     def connector_names(self) -> list[str]:
         """Return a list of connector names that the integrator should create."""
-        return self._connector_names
-
-    @connector_names.setter
-    def connector_names(self, val: list[str]) -> None:
-        self._connector_names = val
+        connectors = []
+        for name in self.dynamic_config.keys():
+            if name.startswith(MULTICONNECTOR_PREFIX):
+                connectors.append(name)
+        return connectors
 
     # Public methods
 
@@ -643,13 +652,15 @@ class BaseIntegrator(ABC, Object):
 
         updated_config = self.dynamic_config.copy()
 
+        # Single configuration
         if isinstance(config, dict):
             updated_config.update(config)
 
+        # Multiple configurations
         if isinstance(config, list):
             for connector_config in config:
                 try:
-                    connector_id = MULTICONNECTOR_PREFIX + connector_config["name"]
+                    connector_id = f"{MULTICONNECTOR_PREFIX}_{connector_config['name']}_{self.connector_unique_name}"
                 except KeyError:
                     logger.error("List of connectors should provide a 'name' key to differentiate them")
                     raise
@@ -671,40 +682,19 @@ class BaseIntegrator(ABC, Object):
 
         self.setup()
 
-        self.connector_names = [
-            key for key in self.dynamic_config.keys()
-            if key.startswith(MULTICONNECTOR_PREFIX)
-        ]
-
-        # We have more than one connector to be executed, so the dictionary needs to be cleaned up
-        if self.connector_names:
-            # This dict will now have the specific configs for each connector
-            connectors = {
-                key: self.dynamic_config[key] for key in self.dynamic_config.keys() 
-                if key.startswith(MULTICONNECTOR_PREFIX)
-            }
-
-            # TODO TODO: this won't work, dynamic_config is a property, and will be reevaluated on
-            # later calls, the pop does nothing here.
-
-            # Clear the subdictionaries from the dynamic_config. Now only the common 
-            # configs will remain
-            for key in self.connector_names:
-                self.dynamic_config.pop(key)
-
-            # Now we can start all the connectors
-            for connector_name in self.connector_names:
-                try:
-                    self._client.start_connector(
-                        connector_config=self.formatter.to_dict(charm_config=self.config, mode="source") | self.dynamic_config | connectors[connector_name],
-                        connector_name=connector_name,
-                    )
-                except ConnectApiError as e:
-                    logger.error(f"Connector start failed, details: {e}")
-                    return
+        # We have more than one connector to be executed. If list is empty, this is skipped
+        for connector_name in self.connector_names:
+            try:
+                self._client.start_connector(
+                    connector_config=self.formatter.to_dict(charm_config=self.config, mode="source") | self.dynamic_config[connector_name],
+                    connector_name=connector_name,
+                )
+            except ConnectApiError as e:
+                logger.error(f"Connector start failed, details: {e}")
+                return
 
         # Single connector case
-        else:
+        if not self.connector_names:
             try:
                 self._client.start_connector(self.formatter.to_dict(charm_config=self.config, mode="source") | self.dynamic_config)
             except ConnectApiError as e:
@@ -715,6 +705,7 @@ class BaseIntegrator(ABC, Object):
 
     def maybe_resume_connector(self) -> None:
         """Restarts/resumes the connector if it's in STOPPED state."""
+        # TODO: resume should cover multiple connectors existing
         if self.connector_status != TaskStatus.STOPPED:
             return
 
@@ -723,6 +714,38 @@ class BaseIntegrator(ABC, Object):
         except ConnectApiError as e:
             logger.error(f"Unable to restart the connector, details: {e}")
             return
+
+    def patch_connector(self) -> None:
+        """Updates the connector(s) configuration.
+
+        Will override the existing configuration for the connector.
+        """
+        if not self.started:
+            logger.info("Connector is not started yet, skipping update.")
+            return
+
+        self.setup()
+
+        # We have more than one connector to be executed. If list is empty, this is skipped
+        for connector_name in self.connector_names:
+            try:
+                self._client.patch_connector(
+                    connector_config=self.formatter.to_dict(charm_config=self.config, mode="source") | self.dynamic_config[connector_name],
+                    connector_name=connector_name,
+                )
+            except ConnectApiError as e:
+                logger.error(f"Connector start failed, details: {e}")
+                return
+
+        # Single connector case
+        if not self.connector_names:
+            try:
+                self._client.patch_connector(self.formatter.to_dict(charm_config=self.config, mode="source") | self.dynamic_config)
+            except ConnectApiError as e:
+                logger.error(f"Connector start failed, details: {e}")
+                return
+
+        self.started = True
 
     @property
     def task_status(self) -> TaskStatus:
