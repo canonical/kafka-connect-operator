@@ -22,6 +22,7 @@ from events.connect import ConnectHandler
 from events.kafka import KafkaHandler
 from events.tls import TLSHandler
 from events.upgrade import ConnectDependencyModel, ConnectUpgrade
+from events.user_secrets import SecretsHandler
 from literals import (
     CHARM_KEY,
     DEPENDENCIES,
@@ -81,6 +82,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
                 **DEPENDENCIES  # pyright: ignore[reportArgumentType]
             ),
         )
+        self.user_secrets = SecretsHandler(self)
 
         self.cos_agent = COSAgentProvider(
             self,
