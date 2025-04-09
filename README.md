@@ -175,6 +175,7 @@ Now, relate `kafka-connect` with the `grafana-agent`:
 
 ```bash
 juju integrate kafka-connect grafana-agent
+```
 
 After this is complete, Grafana will have the `Kafka Connect Cluster` dashboard available.
 
