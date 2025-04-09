@@ -25,26 +25,11 @@ from tenacity import (
     wait_fixed,
 )
 
-from core.models import Context
+from core.models import Context, HealthResponse
 from core.workload import WorkloadBase
 from literals import EMPTY_PLUGIN_CHECKSUM, GROUP, SUBSTRATE, USER
 
 logger = logging.getLogger(__name__)
-
-
-class HealthResponse:
-    """Wrapper object for Connect /health response."""
-
-    def __init__(
-        self, status_code: int, status: str | None = None, message: str | None = None, **_
-    ):
-        self.status_code = status_code
-        self.status = status
-        self.message = message
-
-    def __bool__(self) -> bool:
-        """Returns True if 200 status code. Otherwise False."""
-        return self.status_code == 200
 
 
 class PluginDownloadFailedError(Exception):
