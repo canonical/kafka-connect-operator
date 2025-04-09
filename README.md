@@ -60,15 +60,27 @@ The secret data should contain a mapping of `username=password`s and access to t
 
 The complete flow for defining custom credentials for the Charmed Kafka Connect application is as follows: 
 
+Add a user secret defining the internal `admin` user's password:
+
 ```bash
-# add a user secret defining the internal "admin" user's password
 juju add-secret mysecret admin=adminpass
-# You will receive a secret-id in response which looks like: secret:cvh7kruupa1s46bqvuig
+```
 
-# grant access to the secret
+You will receive a secret-id in response which looks like: 
+
+```bash
+secret:cvh7kruupa1s46bqvuig
+```
+
+Then, grant access to the secret with:
+
+```bash
 juju grant-secret mysecret kafka-connect
+```
 
-# configure Kafka Connect application to use the provided secret
+Finally, configure the Kafka Connect application to use the provided secret:
+
+```bash
 juju config kafka-connect system-users=secret:cvh7kruupa1s46bqvuig
 ```
 
@@ -102,7 +114,7 @@ You should get a response like below:
 
 ## Relations
 
-The Charmed Kafka Connect Operator supports Juju [relations](https://juju.is/docs/olm/relations) for interfaces listed below.
+The Charmed Kafka Connect Operator supports Juju [relations](https://documentation.ubuntu.com/juju/latest/reference/relation/) for interfaces listed below.
 
 #### The `connect_client` interface
 
@@ -120,24 +132,22 @@ Note that TLS can be enabled in three different modes:
 - For the relation between Apache Kafka cluster and Kafka Connect
 - For both the REST interface and the relation
 
-To enable TLS on the Kafka Connect REST interface, use following commands:
+To enable TLS on the Kafka Connect REST interface, first deploy the TLS charm and relate it to the Charmed Kafka Connect application:
 
-```shell
-# deploy the TLS charm
+```bash
 juju deploy self-signed-certificates --channel=stable
-# to enable TLS on Kafka Connect REST endpoint, relate the applications
 juju integrate self-signed-certificates kafka-connect
 ```
 
-To enable TLS on the relation between Apache Kafka cluster and Kafka Connect, use the following commands:
+To enable TLS on the relation between the Apache Kafka and Kafka Connect clusters: 
 
-```
+```bash
 juju integrate self-signed-certificates kafka
 ```
 
-To disable TLS on each interface, remove the respective relation.
+To disable TLS on each interface, remove their respective relations:
 
-```shell
+```bash
 juju remove-relation kafka-connect self-signed-certificates
 juju remove-relation kafka self-signed-certificates
 ```
