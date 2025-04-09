@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from charms.data_platform_libs.v0.data_interfaces import PLUGIN_URL_NOT_REQUIRED
 from ops.charm import (
     ConfigChangedEvent,
+    UpdateStatusEvent,
 )
 from ops.framework import EventBase, Object
 
@@ -52,7 +53,7 @@ class ConnectHandler(Object):
         else:
             self.charm._set_status(self.context.status)
 
-        if isinstance(event, ConfigChangedEvent):
+        if not isinstance(event, UpdateStatusEvent):
             return
 
         # for plugins update if needed

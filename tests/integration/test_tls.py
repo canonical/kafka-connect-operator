@@ -51,11 +51,8 @@ async def test_deploy_tls(ops_test: OpsTest, kafka_connect_charm):
 
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
-            apps=[APP_NAME, KAFKA_APP, TLS_APP], idle_period=60, timeout=1200
+            apps=[APP_NAME, KAFKA_APP, TLS_APP], idle_period=60, timeout=1200, status="active"
         )
-
-    assert ops_test.model.applications[APP_NAME].status == "active"
-    assert ops_test.model.applications[TLS_APP].status == "active"
 
 
 @pytest.mark.abort_on_fail

@@ -176,7 +176,7 @@ class KafkaClientContext(RelationContext):
         if not self.relation:
             return Status.MISSING_KAFKA
 
-        if not self.bootstrap_servers:
+        if not all([self.username, self.password, self.bootstrap_servers]):
             return Status.NO_KAFKA_CREDENTIALS
 
         return Status.ACTIVE

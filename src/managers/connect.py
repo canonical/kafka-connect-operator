@@ -296,5 +296,4 @@ class ConnectManager:
     def restart_worker(self) -> None:
         """Attempts to restart the connect worker."""
         logger.info("Restarting worker service.")
-        self.context.worker_unit.should_restart = False
         self.workload.restart()
