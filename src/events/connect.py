@@ -44,10 +44,16 @@ class ConnectHandler(Object):
 
     def _update_status(self, event: EventBase) -> None:
         """Handler for `update-status` event."""
-        if self.charm.connect_manager.health_check():
+        service_health = self.charm.connect_manager.health()
+
+        if service_health:
             self.charm._set_status(Status.ACTIVE)
             self.charm.unit.set_ports(self.context.rest_port)
             logger.info(f"Connector(s) Status: {self.charm.connect_manager.connectors}")
+        elif service_health.status_code == 503:
+            self.charm._set_status(Status.SERVICE_STARTING)
+        elif service_health.status_code == 500:
+            self.charm._set_status(Status.SERVICE_UNHEALTHY)
         elif self.context.ready:
             self.charm._set_status(Status.SERVICE_NOT_RUNNING)
         else:
