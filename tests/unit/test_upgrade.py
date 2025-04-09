@@ -42,7 +42,9 @@ def upgrade_func() -> str:
     return "_on_upgrade_granted"
 
 
-def test_pre_upgrade_check_raises_not_healthy(ctx: Context, base_state: State) -> None:
+def test_pre_upgrade_check_raises_not_healthy(
+    ctx: Context, base_state: State, dead_service
+) -> None:
     # Given
     state_in = base_state
 
@@ -55,13 +57,12 @@ def test_pre_upgrade_check_raises_not_healthy(ctx: Context, base_state: State) -
             charm.upgrade.pre_upgrade_check()
 
 
-def test_pre_upgrade_check_succeeds(ctx: Context, base_state: State) -> None:
+def test_pre_upgrade_check_succeeds(ctx: Context, base_state: State, active_service) -> None:
     # Given
     state_in = base_state
 
     # When
     with (
-        patch("managers.connect.ConnectManager.health_check", return_value=True),
         patch("events.upgrade.ConnectUpgrade._set_rolling_update_partition"),
         ctx(ctx.on.config_changed(), state_in) as manager,
     ):
@@ -123,7 +124,7 @@ def test_upgrade_granted_sets_failed_if_failed_snap(ctx: Context, base_state: St
 
 
 def test_upgrade_sets_failed_if_failed_upgrade_check(
-    ctx: Context, base_state: State, upgrade_func: str
+    ctx: Context, base_state: State, upgrade_func: str, dead_service
 ) -> None:
     # Given
     state_in = base_state
@@ -134,7 +135,6 @@ def test_upgrade_sets_failed_if_failed_upgrade_check(
         patch("workload.Workload.start") as patched_start,
         patch("workload.Workload.stop"),
         patch("workload.Workload.install"),
-        patch("managers.connect.ConnectManager.health_check", return_value=False),
         patch("core.models.Context.ready", return_value=True),
         patch(
             "events.upgrade.ConnectUpgrade.set_unit_failed",
