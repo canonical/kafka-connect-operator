@@ -86,10 +86,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         )
         self.user_secrets = SecretsHandler(self)
 
-        if self.model.get_relation("restart"):
-            self.restart = RollingOpsManager(
-                self, relation="restart", callback=self._restart_callback
-            )
+        self.restart = RollingOpsManager(self, relation="restart", callback=self._restart_callback)
 
         self.cos_agent = COSAgentProvider(
             self,
@@ -142,13 +139,6 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
             if self.connect_manager.health_check():
                 return
 
-    def perform_restart(self) -> None:
-        """Performs restart operation on the charm, based on the availability of rollingops lib and `restart` relation."""
-        if self.model.get_relation("restart"):
-            self.on[f"{self.restart.name}"].acquire_lock.emit()
-        else:
-            self.connect_manager.restart_worker()
-
     def reconcile(self) -> None:
         """Substrate-agnostic method for startup/restarts/config-changes which orchestrates workload, managers and handlers.
 
@@ -198,7 +188,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.config_manager.configure()
 
         self.context.worker_unit.should_restart = False
-        self.perform_restart()
+        self.on[f"{self.restart.name}"].acquire_lock.emit()
 
 
 if __name__ == "__main__":
