@@ -46,19 +46,19 @@ In the Charmed Kafka Connect operator, adding a plugin is as simple as calling t
 juju attach-resource kafka-connect connect-plugin=./my-plugin.tar
 ```
 
-This would trigger a restart of the `kafka-connect` charm. Once all units are shown as `active|idle`, your new plugin is ready for use. 
+This will trigger a restart of the `kafka-connect` charm. Once all units are shown as `active|idle`, your new plugin is ready for use. 
 
-There is no limit for the number of plugins that could be added manually. However, for common use-cases of ETL tasks on Data Platform charmed operators we recommend using the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) charm.
+While any plugin can be manually uploaded, for common use-cases of ETL tasks on Data Platform charmed operators we recommend using the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) charm.
 
 ### User Management on the REST Interface
 
-Kafka Connect uses a RESTful API for common administrative tasks. By default, Charmed Kafka Connect enforces authentication on the Kafka Connect REST API.
+Kafka Connect uses a RESTful API for common administrative tasks. By default, Charmed Kafka Connect enforces HTTP Basic authentication on this API.
 
 Internal users on the Charmed Kafka Connect application could be managed using [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user). 
 
 The secret data should contain a mapping of `username=password`s and access to the secret should be granted to the Kafka Connect application. Then, the Kafka Connect application should be configured to use the user secret by setting the `system-users` config option.
 
-The complete flow for defining custom credentials on the Charmed Kafka Connect application would be as following: 
+The complete flow for defining custom credentials for the Charmed Kafka Connect application is as follows: 
 
 ```bash
 # add a user secret defining the internal "admin" user's password
@@ -72,7 +72,7 @@ juju grant-secret mysecret kafka-connect
 juju config kafka-connect system-users=secret:cvh7kruupa1s46bqvuig
 ```
 
-To verify that Kafka Connect is properly configured and functioning, you could send a request to the REST interface to list all registered connectors using the password set in Juju secret:
+To verify that Kafka Connect is properly configured and functioning, send a request to the REST interface listing all registered connectors using the password set in Juju secret:
 
 ```bash
 curl -u admin:adminpass -X GET http://<kafka-connect-unit-ip>:8083/connector-plugins
@@ -163,15 +163,14 @@ to relate it to the COS Lite offers.
 
 Now, relate `kafka-connect` with the `grafana-agent`:
 
-```shell
+```bash
 juju integrate kafka-connect grafana-agent
-```
 
 After this is complete, Grafana will have the `Kafka Connect Cluster` dashboard available.
 
 ## Contributing
 
-Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines on enhancements to this charm following best practice guidelines, and [CONTRIBUTING.md](https://github.com/canonical/kafka-connect-operator/blob/main/CONTRIBUTING.md) for developer guidance. 
+Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines on enhancements to this charm following best practice guidelines, and [CONTRIBUTING.md](https://github.com/canonical/kafka-connect-operator/blob/main/CONTRIBUTING.md) for developer guidance.
 
 ### We are Hiring!
 
