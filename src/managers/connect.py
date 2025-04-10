@@ -248,26 +248,19 @@ class ConnectManager:
 
         return TaskStatus.UNKNOWN
 
-    def stop_connector(self, relation_id: int) -> None:
-        """Stops the managed connector instance for given `relation_id`."""
-        for connector, status in self.connectors.items():
+    def delete_connector(self, relation_id: int) -> None:
+        """Deletes the managed connector instance for given `relation_id`."""
+        for connector, _ in self.connectors.items():
             if not re.match(self._managed_connector_regex(relation_id), connector):
                 continue
 
-            if status == TaskStatus.STOPPED:
-                logger.debug("Connector is already stopped.")
-                return
-
-            resp = self._request("PUT", f"connectors/{connector}/stop")
+            resp = self._request("DELETE", f"connectors/{connector}")
 
             if resp.status_code == 204:
-                logger.debug(f"Successfully stopped connector for relation ID={relation_id}.")
-                return
-
-            logger.error(f"Unable to stop connector, details: {resp.content}")
-            return
-
-        logger.error(f"Unable to find a managed connector for relation ID={relation_id}")
+                logger.debug(f"Successfully deleted connector for relation ID={relation_id}.")
+            else:
+                logger.error(f"Unable to delete connector, details: {resp.content}")
+                continue
 
     @retry(
         wait=wait_fixed(3),

@@ -367,6 +367,19 @@ class ConnectClient:
         if response.status_code != 204:
             raise ConnectApiError(f"Unable to stop the connector, details: {response.content}")
 
+    def delete_connector(self, connector_name: str | None = None) -> None:
+        """Deletes a connector at connectors/[CONNECTOR-NAME|connector-name] endpoint.
+
+        Raises:
+            ConnectApiError: If unsuccessful.
+        """
+        response = self.request(
+            method="DELETE", api=f"connectors/{connector_name or self.connector_name}"
+        )
+
+        if response.status_code != 204:
+            raise ConnectApiError(f"Unable to remove the connector, details: {response.content}")
+
     def patch_connector(
         self, connector_config: dict, connector_name: str | None = None
     ) -> None:
@@ -803,5 +816,6 @@ class BaseIntegrator(ABC, Object):
 
     def _on_relation_broken(self, _: RelationBrokenEvent) -> None:
         """Handler for `relation-broken` event."""
+        # TODO: remove from relation databag
         self.teardown()
         self.started = False
