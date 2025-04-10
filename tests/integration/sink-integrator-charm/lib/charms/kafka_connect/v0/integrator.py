@@ -166,7 +166,7 @@ class ConfigOption(BaseModel):
         description (str, optional): A brief description of this config option, which will be added to the charm's `config.yaml`.
     """
 
-    json_key: str  # Config key in the Task configuration JSON
+    json_key: str  # Config key in the Connector configuration JSON
     default: Any  # Default value
     mode: Literal[
         "both", "source", "sink", "none"
@@ -176,7 +176,7 @@ class ConfigOption(BaseModel):
 
 
 class BaseConfigFormatter:
-    """Object used for mapping charm config keys to connector task JSON configuration keys and/or setting default configuration values.
+    """Object used for mapping charm config keys to connector JSON configuration keys and/or setting default configuration values.
 
     Mapping of charm config keys to JSON config keys is provided via `ConfigOption` class variables.
 
@@ -210,7 +210,7 @@ class BaseConfigFormatter:
             option = cast(ConfigOption, getattr(cls, k))
 
             if option.mode == "none":
-                # This is not a task config option
+                # This is not a connector config option
                 continue
 
             if option.mode != "both" and option.mode != mode:
@@ -315,13 +315,16 @@ class ConnectClient:
 
         return response
 
-    def start_connector(self, task_config: dict) -> None:
-        """Starts a connector task by posting `task_config` to the `connectors` endpoint.
+    def start_connector(self, connector_config: dict, connector_name: str | None = None) -> None:
+        """Starts a connector by posting `connector_config` to the `connectors` endpoint.
 
         Raises:
             ConnectApiError: If unsuccessful.
         """
-        _json = {"name": self.connector_name, "config": task_config}
+        _json = {
+            "name": connector_name or self.connector_name,
+            "config": connector_config,
+        }
         response = self.request(method="POST", api="connectors", json=_json)
 
         if response.status_code == 201:
@@ -334,13 +337,15 @@ class ConnectClient:
         logger.error(response.content)
         raise ConnectApiError(f"Unable to start the connector, details: {response.content}")
 
-    def resume_connector(self) -> None:
+    def resume_connector(self, connector_name: str | None = None) -> None:
         """Resumes a connector task by PUTting to the `connectors/<CONNECTOR-NAME>/resume` endpoint.
 
         Raises:
             ConnectApiError: If unsuccessful.
         """
-        response = self.request(method="PUT", api=f"connectors/{self.connector_name}/resume")
+        response = self.request(
+            method="PUT", api=f"connectors/{connector_name or self.connector_name}/resume"
+        )
 
         if response.status_code == 202:
             return
@@ -348,22 +353,55 @@ class ConnectClient:
         logger.error(response.content)
         raise ConnectApiError(f"Unable to resume the connector, details: {response.content}")
 
-    def stop_connector(self) -> None:
-        """Stops a connector by making a request to connectors/CONNECTOR-NAME/stop endpoint.
+    def stop_connector(self, connector_name: str | None = None) -> None:
+        """Stops a connector at connectors/[CONNECTOR-NAME|connector-name]/stop endpoint.
 
         Raises:
             ConnectApiError: If unsuccessful.
         """
-        response = self.request(method="PUT", api=f"connectors/{self.connector_name}/stop")
+        response = self.request(
+            method="PUT", api=f"connectors/{connector_name or self.connector_name}/stop"
+        )
 
         if response.status_code != 204:
             raise ConnectApiError(f"Unable to stop the connector, details: {response.content}")
 
-    def task_status(self) -> TaskStatus:
-        """Returns the task(s) status of a connector."""
+    def delete_connector(self, connector_name: str | None = None) -> None:
+        """Deletes a connector at connectors/[CONNECTOR-NAME|connector-name] endpoint.
+
+        Raises:
+            ConnectApiError: If unsuccessful.
+        """
         response = self.request(
-            method="GET", api=f"connectors/{self.connector_name}/tasks", timeout=10
+            method="DELETE", api=f"connectors/{connector_name or self.connector_name}"
         )
+
+        if response.status_code != 204:
+            raise ConnectApiError(f"Unable to remove the connector, details: {response.content}")
+
+    def patch_connector(self, connector_config: dict, connector_name: str | None = None) -> None:
+        """Patches a connector by PATCHting `connector_config` to the `connectors/<CONNECTOR-NAME>` endpoint.
+
+        Raises:
+            ConnectApiError: If unsuccessful.
+        """
+        response = self.request(
+            method="PATCH",
+            api=f"connectors/{connector_name or self.connector_name}/config",
+            json=connector_config,
+        )
+
+        if response.status_code == 200:
+            return
+
+        logger.error(response.content)
+        raise ConnectApiError(f"Unable to patch the connector, details: {response.content}")
+
+    def task_status(self, connector_name: str | None = None) -> TaskStatus:
+        """Returns the task status of a connector."""
+        connector_name = connector_name or self.connector_name
+
+        response = self.request(method="GET", api=f"connectors/{connector_name}/tasks", timeout=10)
 
         if response.status_code not in (200, 404):
             logger.error(f"Unable to fetch tasks status, details: {response.content}")
@@ -380,7 +418,7 @@ class ConnectClient:
         task_id = tasks[0].get("id", {}).get("task", 0)
         status_response = self.request(
             method="GET",
-            api=f"connectors/{self.connector_name}/tasks/{task_id}/status",
+            api=f"connectors/{connector_name}/tasks/{task_id}/status",
             timeout=10,
         )
 
@@ -469,6 +507,8 @@ class BaseIntegrator(ABC, Object):
     CONFIG_SECRET_FIELD = "config"
     CONNECT_REL = "connect-client"
     PEER_REL = "peer"
+    # Used on MirrorMaker, the integrator needs to spawn 3 connectors per relation
+    MULTICONNECTOR_PREFIX = "mirror"
 
     def __init__(
         self,
@@ -491,6 +531,8 @@ class BaseIntegrator(ABC, Object):
         self.config = charm.config
         self.mode: IntegratorMode = cast(IntegratorMode, self.config.get("mode", self.mode))
         self.helpers: _DataInterfacesHelpers = _DataInterfacesHelpers(self.charm)
+
+        self._connector_names: list[str] = []
 
         # init handlers
         self.rel_name = self.CONNECT_REL
@@ -556,7 +598,7 @@ class BaseIntegrator(ABC, Object):
 
     @property
     def started(self) -> bool:
-        """Returns True if connector task is started, False otherwise."""
+        """Returns True if connector is started, False otherwise."""
         if self._peer_relation is None:
             return False
 
@@ -590,44 +632,99 @@ class BaseIntegrator(ABC, Object):
             )
         )
 
+    @property
+    def connector_names(self) -> list[str]:
+        """Return a list of connector names that the integrator should create."""
+        connectors = []
+        for name in self.dynamic_config.keys():
+            if name.startswith(self.MULTICONNECTOR_PREFIX):
+                connectors.append(name)
+        return connectors
+
     # Public methods
 
-    def configure(self, config: dict[str, Any]) -> None:
+    def configure(self, config: dict[str, Any] | list[dict[str, Any]]) -> None:
         """Dynamically configure the connector with provided `config` dictionary.
 
-        Configuration provided using this method will override default config and config provided by juju runtime (i.e. defined using the `BaseConfigFormmatter` interface).
+        Configuration provided using this method will override default config and config provided
+        by juju runtime (i.e. defined using the `BaseConfigFormmatter` interface).
         All configuration provided using this method are persisted using juju secrets.
-        Each call would update the previous provided configuration (if any), mimicking the `dict.update()` behavior.
+        Each call would update the previous provided configuration (if any), mimicking the
+        `dict.update()` behavior.
+
+        Args:
+            config (dict[str, Any] | list[dict[str, Any]]):
+                - If a single dict is provided, updates the configuration for a single connector.
+                - If a list of dicts is provided, it will create multiple connector. Each dict in
+                  the list represents a separate connector configuration. A "name" key should be
+                  used to help differentiate connector names.
         """
         if self._peer_relation is None:
             return
 
-        updated_config = self.dynamic_config | config
+        updated_config = self.dynamic_config.copy()
+
+        # Single configuration
+        if isinstance(config, dict):
+            updated_config.update(config)
+
+        # Multiple configurations
+        if isinstance(config, list):
+            for connector_config in config:
+                try:
+                    connector_id = f"{self.MULTICONNECTOR_PREFIX}_{connector_config['name']}_{self.connector_unique_name}"
+                except KeyError:
+                    logger.error(
+                        "List of connectors should provide a 'name' key to differentiate them"
+                    )
+                    raise
+
+                # Remove "name" key so it's not part of the config passed to the JSON afterwards
+                connector_config.pop("name")
+                updated_config[connector_id] = connector_config
 
         self._peer_unit_interface.update_relation_data(
             self._peer_relation.id, data={self.CONFIG_SECRET_FIELD: json.dumps(updated_config)}
         )
 
     def start_connector(self) -> None:
-        """Starts the connector."""
+        """Starts the connectors."""
         if self.started:
-            logger.info("Connector task has already started")
+            logger.info("Connector has already started")
             return
 
         self.setup()
 
-        try:
-            self._client.start_connector(
-                self.formatter.to_dict(self.config, self.mode) | self.dynamic_config
-            )
-        except ConnectApiError as e:
-            logger.error(f"Unable to start the connector, details: {e}")
-            return
+        # We have more than one connector to be executed. If list is empty, this is skipped
+        for connector_name in self.connector_names:
+            try:
+                self._client.start_connector(
+                    connector_config=self.formatter.to_dict(
+                        charm_config=self.config, mode="source"
+                    )
+                    | self.dynamic_config[connector_name],
+                    connector_name=connector_name,
+                )
+            except ConnectApiError as e:
+                logger.error(f"Connector start failed, details: {e}")
+                return
+
+        # Single connector case
+        if not self.connector_names:
+            try:
+                self._client.start_connector(
+                    self.formatter.to_dict(charm_config=self.config, mode="source")
+                    | self.dynamic_config
+                )
+            except ConnectApiError as e:
+                logger.error(f"Connector start failed, details: {e}")
+                return
 
         self.started = True
 
     def maybe_resume_connector(self) -> None:
         """Restarts/resumes the connector if it's in STOPPED state."""
+        # TODO: resume should cover multiple connectors existing
         if self.connector_status != TaskStatus.STOPPED:
             return
 
@@ -637,11 +734,53 @@ class BaseIntegrator(ABC, Object):
             logger.error(f"Unable to restart the connector, details: {e}")
             return
 
+    def patch_connector(self) -> None:
+        """Updates the connector(s) configuration.
+
+        Will override the existing configuration for the connector.
+        """
+        if not self.started:
+            logger.info("Connector is not started yet, skipping update.")
+            return
+
+        self.setup()
+
+        # We have more than one connector to be executed. If list is empty, this is skipped
+        for connector_name in self.connector_names:
+            try:
+                self._client.patch_connector(
+                    connector_config=self.formatter.to_dict(
+                        charm_config=self.config, mode="source"
+                    )
+                    | self.dynamic_config[connector_name],
+                    connector_name=connector_name,
+                )
+            except ConnectApiError as e:
+                logger.error(f"Connector start failed, details: {e}")
+                return
+
+        # Single connector case
+        if not self.connector_names:
+            try:
+                self._client.patch_connector(
+                    self.formatter.to_dict(charm_config=self.config, mode="source")
+                    | self.dynamic_config
+                )
+            except ConnectApiError as e:
+                logger.error(f"Connector start failed, details: {e}")
+                return
+
+        self.started = True
+
     @property
     def task_status(self) -> TaskStatus:
         """Returns connector task status."""
         if not self.started:
             return TaskStatus.UNASSIGNED
+
+        # TODO: status should be handled in a more complex way than this
+        if self.connector_names:
+            return self._client.task_status(connector_name=self.connector_names[0])
 
         return self._client.task_status()
 
@@ -655,17 +794,17 @@ class BaseIntegrator(ABC, Object):
     @property
     @abstractmethod
     def ready(self) -> bool:
-        """Should return True if all conditions for startig the task is met, including if all client relations are setup successfully."""
+        """Should return True if all conditions for startig the connector is met, including if all client relations are setup successfully."""
         ...
 
     @abstractmethod
     def setup(self) -> None:
-        """Should perform all necessary actions before connector task is started."""
+        """Should perform all necessary actions before connector is started."""
         ...
 
     @abstractmethod
     def teardown(self) -> None:
-        """Should perform all necessary cleanups after connector task is stopped."""
+        """Should perform all necessary cleanups after connector is stopped."""
         ...
 
     # Event handlers
@@ -677,7 +816,7 @@ class BaseIntegrator(ABC, Object):
             event.defer()
             return
 
-        logger.info(f"Starting {self.name} task...")
+        logger.info(f"Starting {self.name} connector...")
         self.start_connector()
 
         if not self.started:
@@ -689,5 +828,6 @@ class BaseIntegrator(ABC, Object):
 
     def _on_relation_broken(self, _: RelationBrokenEvent) -> None:
         """Handler for `relation-broken` event."""
+        # TODO: remove from relation databag
         self.teardown()
         self.started = False

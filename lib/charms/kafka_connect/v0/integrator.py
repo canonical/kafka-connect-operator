@@ -57,9 +57,6 @@ class ConnectApiError(Exception):
 
 IntegratorMode = Literal["source", "sink"]
 
-# Used on MirrorMaker, the integrator needs to spawn 3 connectors per relation
-MULTICONNECTOR_PREFIX = "mirror"
-
 
 class TaskStatus(str, Enum):
     """Enum for Connector task status representation."""
@@ -346,7 +343,9 @@ class ConnectClient:
         Raises:
             ConnectApiError: If unsuccessful.
         """
-        response = self.request(method="PUT", api=f"connectors/{connector_name or self.connector_name}/resume")
+        response = self.request(
+            method="PUT", api=f"connectors/{connector_name or self.connector_name}/resume"
+        )
 
         if response.status_code == 202:
             return
@@ -380,9 +379,7 @@ class ConnectClient:
         if response.status_code != 204:
             raise ConnectApiError(f"Unable to remove the connector, details: {response.content}")
 
-    def patch_connector(
-        self, connector_config: dict, connector_name: str | None = None
-    ) -> None:
+    def patch_connector(self, connector_config: dict, connector_name: str | None = None) -> None:
         """Patches a connector by PATCHting `connector_config` to the `connectors/<CONNECTOR-NAME>` endpoint.
 
         Raises:
@@ -510,6 +507,8 @@ class BaseIntegrator(ABC, Object):
     CONFIG_SECRET_FIELD = "config"
     CONNECT_REL = "connect-client"
     PEER_REL = "peer"
+    # Used on MirrorMaker, the integrator needs to spawn 3 connectors per relation
+    MULTICONNECTOR_PREFIX = "mirror"
 
     def __init__(
         self,
@@ -638,7 +637,7 @@ class BaseIntegrator(ABC, Object):
         """Return a list of connector names that the integrator should create."""
         connectors = []
         for name in self.dynamic_config.keys():
-            if name.startswith(MULTICONNECTOR_PREFIX):
+            if name.startswith(self.MULTICONNECTOR_PREFIX):
                 connectors.append(name)
         return connectors
 
@@ -647,17 +646,17 @@ class BaseIntegrator(ABC, Object):
     def configure(self, config: dict[str, Any] | list[dict[str, Any]]) -> None:
         """Dynamically configure the connector with provided `config` dictionary.
 
-        Configuration provided using this method will override default config and config provided 
+        Configuration provided using this method will override default config and config provided
         by juju runtime (i.e. defined using the `BaseConfigFormmatter` interface).
         All configuration provided using this method are persisted using juju secrets.
-        Each call would update the previous provided configuration (if any), mimicking the 
+        Each call would update the previous provided configuration (if any), mimicking the
         `dict.update()` behavior.
 
         Args:
-            config (dict[str, Any] | list[dict[str, Any]]): 
+            config (dict[str, Any] | list[dict[str, Any]]):
                 - If a single dict is provided, updates the configuration for a single connector.
-                - If a list of dicts is provided, it will create multiple connector. Each dict in 
-                  the list represents a separate connector configuration. A "name" key should be 
+                - If a list of dicts is provided, it will create multiple connector. Each dict in
+                  the list represents a separate connector configuration. A "name" key should be
                   used to help differentiate connector names.
         """
         if self._peer_relation is None:
@@ -673,9 +672,11 @@ class BaseIntegrator(ABC, Object):
         if isinstance(config, list):
             for connector_config in config:
                 try:
-                    connector_id = f"{MULTICONNECTOR_PREFIX}_{connector_config['name']}_{self.connector_unique_name}"
+                    connector_id = f"{self.MULTICONNECTOR_PREFIX}_{connector_config['name']}_{self.connector_unique_name}"
                 except KeyError:
-                    logger.error("List of connectors should provide a 'name' key to differentiate them")
+                    logger.error(
+                        "List of connectors should provide a 'name' key to differentiate them"
+                    )
                     raise
 
                 # Remove "name" key so it's not part of the config passed to the JSON afterwards
@@ -683,8 +684,7 @@ class BaseIntegrator(ABC, Object):
                 updated_config[connector_id] = connector_config
 
         self._peer_unit_interface.update_relation_data(
-            self._peer_relation.id, 
-            data={self.CONFIG_SECRET_FIELD: json.dumps(updated_config)}
+            self._peer_relation.id, data={self.CONFIG_SECRET_FIELD: json.dumps(updated_config)}
         )
 
     def start_connector(self) -> None:
@@ -699,7 +699,10 @@ class BaseIntegrator(ABC, Object):
         for connector_name in self.connector_names:
             try:
                 self._client.start_connector(
-                    connector_config=self.formatter.to_dict(charm_config=self.config, mode="source") | self.dynamic_config[connector_name],
+                    connector_config=self.formatter.to_dict(
+                        charm_config=self.config, mode="source"
+                    )
+                    | self.dynamic_config[connector_name],
                     connector_name=connector_name,
                 )
             except ConnectApiError as e:
@@ -709,7 +712,10 @@ class BaseIntegrator(ABC, Object):
         # Single connector case
         if not self.connector_names:
             try:
-                self._client.start_connector(self.formatter.to_dict(charm_config=self.config, mode="source") | self.dynamic_config)
+                self._client.start_connector(
+                    self.formatter.to_dict(charm_config=self.config, mode="source")
+                    | self.dynamic_config
+                )
             except ConnectApiError as e:
                 logger.error(f"Connector start failed, details: {e}")
                 return
@@ -743,7 +749,10 @@ class BaseIntegrator(ABC, Object):
         for connector_name in self.connector_names:
             try:
                 self._client.patch_connector(
-                    connector_config=self.formatter.to_dict(charm_config=self.config, mode="source") | self.dynamic_config[connector_name],
+                    connector_config=self.formatter.to_dict(
+                        charm_config=self.config, mode="source"
+                    )
+                    | self.dynamic_config[connector_name],
                     connector_name=connector_name,
                 )
             except ConnectApiError as e:
@@ -753,7 +762,10 @@ class BaseIntegrator(ABC, Object):
         # Single connector case
         if not self.connector_names:
             try:
-                self._client.patch_connector(self.formatter.to_dict(charm_config=self.config, mode="source") | self.dynamic_config)
+                self._client.patch_connector(
+                    self.formatter.to_dict(charm_config=self.config, mode="source")
+                    | self.dynamic_config
+                )
             except ConnectApiError as e:
                 logger.error(f"Connector start failed, details: {e}")
                 return

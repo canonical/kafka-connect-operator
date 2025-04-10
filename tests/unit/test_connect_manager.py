@@ -176,7 +176,7 @@ def test_load_plugin_from_url(
 def test_connector_lifecycle_management(
     connect_manager: ConnectManager, healthy: bool, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Tests `connector_status` and `stop_connector` methods used for connector lifecycle management."""
+    """Tests `connector_status` and `delete_connector` methods used for connector lifecycle management."""
     with patch("requests.request") as _fake_request:
         connect_manager.health_check = lambda: healthy
         response = MagicMock()
@@ -194,16 +194,16 @@ def test_connector_lifecycle_management(
         response.status_code = 204
         for rel_id in (1, 11):
             assert connect_manager.connector_status(rel_id).value == expected_status[rel_id]
-            connect_manager.stop_connector(rel_id)
+            connect_manager.delete_connector(rel_id)
 
         assert connect_manager.connector_status(12).value == expected_status[12]
 
-        connect_manager.stop_connector(12)
-        assert caplog.messages[-1] == "Successfully stopped connector for relation ID=12."
+        connect_manager.delete_connector(12) 
+        assert caplog.messages[-1] == "Successfully deleted connector for relation ID=12."
 
         response.status_code = 500
-        connect_manager.stop_connector(12)
-        assert caplog.messages[-1].startswith("Unable to stop connector, details:")
+        connect_manager.delete_connector(12)
+        assert caplog.messages[-1].startswith("Unable to delete connector, details:")
 
 
 @pytest.mark.parametrize("status_code", (200, 500))
