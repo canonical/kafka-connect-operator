@@ -828,6 +828,5 @@ class BaseIntegrator(ABC, Object):
 
     def _on_relation_broken(self, _: RelationBrokenEvent) -> None:
         """Handler for `relation-broken` event."""
-        # TODO: remove from relation databag
         self.teardown()
         self.started = False
