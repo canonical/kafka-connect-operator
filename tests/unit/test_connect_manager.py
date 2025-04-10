@@ -198,7 +198,7 @@ def test_connector_lifecycle_management(
 
         assert connect_manager.connector_status(12).value == expected_status[12]
 
-        connect_manager.delete_connector(12) 
+        connect_manager.delete_connector(12)
         assert caplog.messages[-1] == "Successfully deleted connector for relation ID=12."
 
         response.status_code = 500
