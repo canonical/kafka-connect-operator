@@ -461,6 +461,14 @@ class _DataInterfacesHelpers:
     def __init__(self, charm: CharmBase):
         self.charm = charm
 
+    def remote_app_name(self, relation_name: str) -> str:
+        """Returns the remote application name for the given relation name."""
+        relation = self.charm.model.get_relation(relation_name=relation_name)
+        if not relation:
+            return ""
+
+        return relation.app.name
+
     def fetch_all_relation_data(self, relation_name: str) -> MutableMapping:
         """Returns a MutableMapping of all relation data available to the unit on `relation_name`, either via databag or secrets."""
         relation = self.charm.model.get_relation(relation_name=relation_name)
@@ -828,6 +836,5 @@ class BaseIntegrator(ABC, Object):
 
     def _on_relation_broken(self, _: RelationBrokenEvent) -> None:
         """Handler for `relation-broken` event."""
-        # TODO: remove from relation databag
         self.teardown()
         self.started = False
