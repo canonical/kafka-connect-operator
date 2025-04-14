@@ -73,7 +73,7 @@ class ConnectManager:
     @property
     def connectors(self) -> dict[str, TaskStatus]:
         """Returns a mapping of connector names to their status."""
-        if not self.health:
+        if not self.healthy:
             return {}
 
         resp = self._request("GET", "/connectors?expand=status").json()
@@ -266,6 +266,7 @@ class ConnectManager:
                 logger.error(f"Unable to delete connector, details: {resp.content}")
                 continue
 
+    @property
     @retry(
         wait=wait_fixed(3),
         stop=stop_after_attempt(5),
@@ -274,7 +275,7 @@ class ConnectManager:
         ),
         retry_error_callback=lambda _: HealthResponse(status_code=-1),
     )
-    def health(self) -> HealthResponse:
+    def healthy(self) -> HealthResponse:
         """Checks the health of connect service by pinging the Connect API."""
         response = self._get_health()
 

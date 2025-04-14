@@ -181,6 +181,10 @@ def test_connector_lifecycle_management(
         response.json.return_value = STATUS_RESPONSE
         _fake_request.return_value = response
 
+        health_response = MagicMock()
+        health_response.status_code = 200
+        connect_manager._get_health = lambda: health_response
+
         assert len(connect_manager.connectors) == 3
 
         expected_status = {1: "UNKNOWN", 11: "STOPPED", 12: "RUNNING"}
@@ -192,12 +196,12 @@ def test_connector_lifecycle_management(
 
         assert connect_manager.connector_status(12).value == expected_status[12]
 
-        connect_manager.delete_connector(12)
-        assert caplog.messages[-1] == "Successfully deleted connector for relation ID=12."
+        connect_manager.stop_connector(12)
+        assert caplog.messages[-1] == "Successfully stopped connector for relation ID=12."
 
         response.status_code = 500
-        connect_manager.delete_connector(12)
-        assert caplog.messages[-1].startswith("Unable to delete connector, details:")
+        connect_manager.stop_connector(12)
+        assert caplog.messages[-1].startswith("Unable to stop connector, details:")
 
 
 @pytest.mark.parametrize("status_code,correct_response", [(200, True), (500, False), (404, False)])
@@ -211,4 +215,4 @@ def test_health_check(
         response.json.return_value = {}
         _fake_request.return_value = response
 
-        assert bool(connect_manager.health()) is correct_response
+        assert bool(connect_manager.healthy) is correct_response
