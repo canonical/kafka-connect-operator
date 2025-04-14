@@ -44,7 +44,7 @@ class ConnectHandler(Object):
 
     def _update_status(self, event: EventBase) -> None:
         """Handler for `update-status` event."""
-        service_health = self.charm.connect_manager.health()
+        service_health = self.charm.connect_manager.healthy
 
         if service_health:
             self.charm._set_status(Status.ACTIVE)

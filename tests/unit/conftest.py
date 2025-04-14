@@ -4,7 +4,7 @@
 
 from collections import defaultdict
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import pytest
 import yaml
@@ -92,7 +92,9 @@ def active_service():
 
     with (
         patch(
-            "managers.connect.ConnectManager.health", return_value=HealthResponse(status_code=200)
+            "managers.connect.ConnectManager.healthy",
+            new_callable=PropertyMock,
+            return_value=HealthResponse(status_code=200),
         ) as patched_service,
         patch("managers.connect.ConnectManager._request", return_value=mock_response),
     ):
@@ -106,7 +108,9 @@ def dead_service():
 
     with (
         patch(
-            "managers.connect.ConnectManager.health", return_value=HealthResponse(status_code=503)
+            "managers.connect.ConnectManager.healthy",
+            new_callable=PropertyMock,
+            return_value=HealthResponse(status_code=503),
         ) as patched_service,
         patch("managers.connect.ConnectManager._request", return_value=mock_response),
     ):
