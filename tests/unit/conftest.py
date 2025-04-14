@@ -4,7 +4,7 @@
 
 from collections import defaultdict
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import pytest
 import yaml
@@ -12,6 +12,7 @@ from ops.testing import Container, Context, Resource, State
 from src.charm import ConnectCharm
 from src.core.workload import Paths
 from src.literals import CONTAINER, PLUGIN_RESOURCE_KEY, SNAP_NAME, SUBSTRATE
+from src.managers.connect import HealthResponse
 
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 ACTIONS = yaml.safe_load(Path("./actions.yaml").read_text())
@@ -96,14 +97,32 @@ def plugin_resource():
     return Resource(name=PLUGIN_RESOURCE_KEY, path="./tests/unit/resources/FakePlugin.tar")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def active_service():
     mock_response = MagicMock()
     mock_response.json.return_value = {}
 
     with (
         patch(
-            "managers.connect.ConnectManager.health_check", return_value=True
+            "managers.connect.ConnectManager.healthy",
+            new_callable=PropertyMock,
+            return_value=HealthResponse(status_code=200),
+        ) as patched_service,
+        patch("managers.connect.ConnectManager._request", return_value=mock_response),
+    ):
+        yield patched_service
+
+
+@pytest.fixture(scope="function")
+def dead_service():
+    mock_response = MagicMock()
+    mock_response.json.return_value = {}
+
+    with (
+        patch(
+            "managers.connect.ConnectManager.healthy",
+            new_callable=PropertyMock,
+            return_value=HealthResponse(status_code=503),
         ) as patched_service,
         patch("managers.connect.ConnectManager._request", return_value=mock_response),
     ):
