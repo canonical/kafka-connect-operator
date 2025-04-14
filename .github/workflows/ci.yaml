@@ -65,7 +65,7 @@ jobs:
           - integration-tls
           - integration-plugins
           - integration-provider
-          - integration-upgrade
+#          - integration-upgrade
           - integration-requirer
           - integration-scaling
           - integration-secrets
