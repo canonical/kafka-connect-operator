@@ -129,7 +129,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
 
     def _restart_callback(self, event: EventBase) -> None:
         """Handler for `rolling_ops` restart events."""
-        if not self.context.ready:
+        if not self.context.ready or not self.context.worker_unit.should_restart:
             return
 
         self.connect_manager.restart_worker()
@@ -137,6 +137,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         for _ in range(4):
             # shouldn't take longer than a minute
             if self.connect_manager.health_check():
+                self.context.worker_unit.should_restart = False
                 return
 
     def reconcile(self) -> None:
@@ -187,7 +188,6 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.tls_manager.configure()
         self.config_manager.configure()
 
-        self.context.worker_unit.should_restart = False
         self.on[f"{self.restart.name}"].acquire_lock.emit()
 
 
