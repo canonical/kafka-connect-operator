@@ -135,7 +135,7 @@ Note that TLS can be enabled in three different modes:
 To enable TLS on the Kafka Connect REST interface, first deploy the TLS charm and relate it to the Charmed Kafka Connect application:
 
 ```bash
-juju deploy self-signed-certificates --channel=stable
+juju deploy self-signed-certificates
 juju integrate self-signed-certificates kafka-connect
 ```
 
