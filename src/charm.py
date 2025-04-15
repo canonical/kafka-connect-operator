@@ -10,8 +10,10 @@ import logging
 import ops
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
+from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from ops import (
     CollectStatusEvent,
+    EventBase,
     ModelError,
     StatusBase,
 )
@@ -84,6 +86,8 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         )
         self.user_secrets = SecretsHandler(self)
 
+        self.restart = RollingOpsManager(self, relation="restart", callback=self._restart_callback)
+
         self.cos_agent = COSAgentProvider(
             self,
             metrics_endpoints=[
@@ -123,6 +127,19 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         for status in self.pending_inactive_statuses + [workload_status]:
             event.add_status(status.value.status)
 
+    def _restart_callback(self, event: EventBase) -> None:
+        """Handler for `rolling_ops` restart events."""
+        if not self.context.ready or not self.context.worker_unit.should_restart:
+            return
+
+        self.connect_manager.restart_worker()
+
+        for _ in range(4):
+            # shouldn't take longer than a minute
+            if self.connect_manager.health_check():
+                self.context.worker_unit.should_restart = False
+                return
+
     def reconcile(self) -> None:
         """Substrate-agnostic method for startup/restarts/config-changes which orchestrates workload, managers and handlers.
 
@@ -160,7 +177,10 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         current_config = set(self.workload.read(self.workload.paths.worker_properties))
         diff = set(self.config_manager.properties) ^ current_config
 
-        if not any([diff, self.context.worker_unit.should_restart]):
+        if diff:
+            self.context.worker_unit.should_restart = True
+
+        if not self.context.worker_unit.should_restart:
             return
 
         if not self.context.ready:
@@ -170,7 +190,8 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.connect.enable_auth()
         self.tls_manager.configure()
         self.config_manager.configure()
-        self.connect_manager.restart_worker()
+
+        self.on[f"{self.restart.name}"].acquire_lock.emit()
 
 
 if __name__ == "__main__":

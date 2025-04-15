@@ -61,12 +61,17 @@ def test_kafka_client_relation_created_waits_for_credentials(
 
 @pytest.mark.parametrize("broker_available", [False, True])
 def test_kafka_client_relation_created_checks_broker_availability(
-    ctx: Context, base_state: State, kafka_client_rel: dict, broker_available: bool, active_service
+    ctx: Context,
+    base_state: State,
+    kafka_client_rel: dict,
+    broker_available: bool,
+    active_service,
+    restart_rel,
 ) -> None:
     """Checks unit checks Kafka broker listener availability before transitioning to Active status."""
     # Given
     kafka_rel = Relation(KAFKA_CLIENT_REL, KAFKA_CLIENT_REL, remote_app_data=kafka_client_rel)
-    state_in = dataclasses.replace(base_state, relations=[kafka_rel])
+    state_in = dataclasses.replace(base_state, relations=[kafka_rel, restart_rel])
 
     # When
     with (
@@ -74,7 +79,6 @@ def test_kafka_client_relation_created_checks_broker_availability(
             "workload.Workload.check_socket",
             return_value=broker_available,
         ) as fake_check_socket,
-        patch("workload.Workload.restart") as _restart,
     ):
         state_out = ctx.run(ctx.on.relation_created(kafka_rel), state_in)
 
@@ -88,19 +92,20 @@ def test_kafka_client_relation_created_checks_broker_availability(
 
 
 def test_kafka_client_relation_change_triggers_restart(
-    ctx: Context, base_state: State, kafka_client_rel: dict, active_service
+    ctx: Context, base_state: State, kafka_client_rel: dict, active_service, restart_rel
 ) -> None:
     """Checks change in `kafka-client` relation configuration triggers a restart."""
     # Given
     kafka_rel = Relation(KAFKA_CLIENT_REL, KAFKA_CLIENT_REL, remote_app_data=kafka_client_rel)
-    state_in = dataclasses.replace(base_state, relations=[kafka_rel])
+    peer_rel = PeerRelation(PEER_REL, PEER_REL)
+    state_in = dataclasses.replace(base_state, relations=[kafka_rel, peer_rel, restart_rel])
 
     # When
     with (patch("workload.Workload.read"), patch("workload.Workload.restart") as _restart):
         state_out = ctx.run(ctx.on.relation_changed(kafka_rel), state_in)
 
     # Then
-    assert _restart.call_count == 1
+    _restart.assert_called_once()
     assert state_out.unit_status == Status.ACTIVE.value.status
 
 
@@ -121,13 +126,18 @@ def test_kafka_client_relation_broken(
 
 @pytest.mark.parametrize("admin_password", ["", "password"])
 def test_enable_auth(
-    ctx: Context, base_state: State, kafka_client_rel: dict, active_service, admin_password
+    ctx: Context,
+    base_state: State,
+    kafka_client_rel: dict,
+    active_service,
+    admin_password,
+    restart_rel,
 ) -> None:
     """Checks `enable_auth` functionality on service startup."""
     # Given
     kafka_rel = Relation(KAFKA_CLIENT_REL, KAFKA_CLIENT_REL, remote_app_data=kafka_client_rel)
     peer_rel = PeerRelation(PEER_REL, PEER_REL)
-    state_in = dataclasses.replace(base_state, relations=[kafka_rel, peer_rel])
+    state_in = dataclasses.replace(base_state, relations=[kafka_rel, peer_rel, restart_rel])
     auth_manager_mock = MagicMock()
 
     # When
@@ -148,7 +158,7 @@ def test_enable_auth(
     }
 
     # Then
-    assert _restart.call_count == 1
+    _restart.assert_called_once()
     assert state_out.unit_status == Status.ACTIVE.value.status
     assert auth_manager_mock.update.call_count == 1
 

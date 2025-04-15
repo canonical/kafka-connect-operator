@@ -35,7 +35,7 @@ class ConfigOverride:
         return f'{self.key}: {",".join([str(v) for v in self.values])} -> {state}'
 
 
-def test_defaults(ctx: Context, base_state: State) -> None:
+def test_defaults(ctx: Context, base_state: State, active_service) -> None:
     """Checks `ConfigManager` populates default config properties properly based on charm config & opinionated, hard-coded defaults."""
     # Given
     state_in = base_state

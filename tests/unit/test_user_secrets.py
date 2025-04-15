@@ -14,7 +14,12 @@ AUTH_CONFIG_KEY = "system-users"
 
 @pytest.mark.parametrize("secret_provided", [True, False])
 def test_set_credentials(
-    ctx: Context, base_state: State, kafka_client_rel: dict, secret_provided: bool, active_service
+    ctx: Context,
+    base_state: State,
+    kafka_client_rel: dict,
+    secret_provided: bool,
+    active_service,
+    restart_rel,
 ) -> None:
     """Tests setting username/passwords through secrets."""
     auth_secret = Secret(
@@ -25,7 +30,7 @@ def test_set_credentials(
     peer_rel = PeerRelation(PEER_REL, PEER_REL, local_app_data={"admin-password": "oldpass"})
     state_in = dataclasses.replace(
         base_state,
-        relations=[kafka_rel, peer_rel],
+        relations=[kafka_rel, peer_rel, restart_rel],
         secrets=[auth_secret],
         config={AUTH_CONFIG_KEY: auth_secret.id} if secret_provided else {},
     )
@@ -49,7 +54,12 @@ def test_set_credentials(
 
 
 def test_remove_credentials(
-    ctx: Context, base_state: State, kafka_client_rel: dict, active_service, workload_with_io
+    ctx: Context,
+    base_state: State,
+    kafka_client_rel: dict,
+    active_service,
+    workload_with_io,
+    restart_rel,
 ) -> None:
     """Tests removing users through secrets."""
     auth_secret = Secret(
@@ -60,7 +70,7 @@ def test_remove_credentials(
     peer_rel = PeerRelation(PEER_REL, PEER_REL, local_app_data={"admin-password": "oldpass"})
     state_in = dataclasses.replace(
         base_state,
-        relations=[kafka_rel, peer_rel],
+        relations=[kafka_rel, peer_rel, restart_rel],
         secrets=[auth_secret],
     )
 
