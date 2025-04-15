@@ -83,7 +83,6 @@ def test_config_changed_update_clients_data(
     ):
         _ = ctx.run(ctx.on.config_changed(), state_in)
 
-    print(patched_update.call_args)
     # Then
     if plugin_url == PLUGIN_URL_NOT_REQUIRED:
         assert patched_update.call_count
