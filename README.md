@@ -36,7 +36,7 @@ $ juju integrate kafka-connect kafka
 
 To watch the process, `juju status` can be used. Once all the units show as `active|idle`, the Kafka Connect cluster is ready to be used.
 
-### Plugin Management
+### Plugin management
 
 Kafka Connect uses a pluggable architecture model, meaning that the user could add desired functionalities by means of **Plugins**, also known as **Connectors**. Simply put, plugins are bundles of JAR files adhering to Kafka Connect Connector Interface. These connectors could be an implementation of a data source connector, data sink connector, a transformer or a converter. Kafka Connect automatically discovers added plugins, and the user could use the exposed REST interface to define desired ETL tasks based on available plugins.
 
@@ -50,7 +50,7 @@ This will trigger a restart of the `kafka-connect` charm. Once all units are sho
 
 While any plugin can be manually uploaded, for common use-cases of ETL tasks on Data Platform charmed operators we recommend using the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) charm.
 
-### User Management on the REST Interface
+### User management via REST API
 
 Kafka Connect uses a RESTful API for common administrative tasks. By default, Charmed Kafka Connect enforces HTTP Basic authentication on this API.
 
@@ -116,13 +116,13 @@ You should get a response like below:
 
 The Charmed Kafka Connect Operator supports Juju [relations](https://documentation.ubuntu.com/juju/latest/reference/relation/) for interfaces listed below.
 
-#### The `connect_client` interface
+### The `connect_client` interface
 
 The `connect_client` interface is used with any requirer/integrator charm which has the capability of integration with Charmed Kafka Connect and possibly, one or more other [Data Platform charms](https://canonical.com/data). Integrators will automatically handle connectors/tasks lifecycle on Kafka Connect including plugin management, startup, cleanup, and scaling, and simplify common ETL operations on Data Platform line of products.
 
 A curated set of integrators for common ETL use cases within the Canonical Data Platform product line is available in the [Template Connect Integrator](https://github.com/canonical/template-connect-integrator) repository. These integrators support use cases such as loading data to and from MySQL, PostgreSQL, OpenSearch, S3-compatible storage services, and active/passive replication of Apache Kafka topics using MirrorMaker.
 
-#### The `tls-certificates` interface
+### The `tls-certificates` interface
 
 The `tls-certificates` interface could be used with any charm that provides TLS certificate lifecycle management functionality, following [`this specification`](https://github.com/canonical/charm-relation-interfaces/tree/main/docs/json_schemas/tls_certificates/v1). One example is the [`self-signed-certificates`](https://github.com/canonical/self-signed-certificates-operator) operator by Canonical.
 
@@ -152,7 +152,7 @@ juju remove-relation kafka-connect self-signed-certificates
 juju remove-relation kafka self-signed-certificates
 ```
 
-> Note: The TLS settings here are for self-signed-certificates which are not recommended for production clusters, the `tls-certificates-operator` charm offers a variety of configurations, read more on the TLS charm [here](https://charmhub.io/tls-certificates-operator)
+> Note: The TLS settings provided here are intended for use with self-signed certificates, which are not recommended for production clusters. For more secure TLS certificate providers, consider using the `tls-certificates-operator` charm. See its [Charmhub page](https://charmhub.io/tls-certificates-operator) for details.
 
 ## Monitoring
 
@@ -162,16 +162,16 @@ The metrics can be queried by accessing the `http://<unit-ip>:9100/metrics` endp
 Additionally, the charm provides integration with the [Canonical Observability Stack](https://charmhub.io/topics/canonical-observability-stack).
 
 Deploy the `cos-lite` bundle in a Kubernetes environment. This can be done by following the
-[deployment tutorial](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s).
-Since the Charmed Kafka Connect Operator is deployed on a machine environment, it is needed to offer the endpoints
-of the COS relations. The [offers-overlay](https://github.com/canonical/cos-lite-bundle/blob/main/overlays/offers-overlay.yaml)
-can be used, and this step is shown in the COS tutorial.
+[COS deployment tutorial](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s).
+Since the Charmed Kafka Connect Operator is deployed on a machine environment, it needs to offer the endpoints
+for the COS relations. The [offers-overlay](https://github.com/canonical/cos-lite-bundle/blob/main/overlays/offers-overlay.yaml)
+can be used for that, see the COS deployment tutorial link above for guidance.
 
 Next, deploy [grafana-agent](https://charmhub.io/grafana-agent) and follow the
 [tutorial](https://discourse.charmhub.io/t/using-the-grafana-agent-machine-charm/8896)
 to relate it to the COS Lite offers.
 
-Now, relate `kafka-connect` with the `grafana-agent`:
+Now, integrate `kafka-connect` and `grafana-agent` charms:
 
 ```bash
 juju integrate kafka-connect grafana-agent
