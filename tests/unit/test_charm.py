@@ -97,7 +97,8 @@ def test_kafka_client_relation_change_triggers_restart(
     """Checks change in `kafka-client` relation configuration triggers a restart."""
     # Given
     kafka_rel = Relation(KAFKA_CLIENT_REL, KAFKA_CLIENT_REL, remote_app_data=kafka_client_rel)
-    state_in = dataclasses.replace(base_state, relations=[kafka_rel, restart_rel])
+    peer_rel = PeerRelation(PEER_REL, PEER_REL)
+    state_in = dataclasses.replace(base_state, relations=[kafka_rel, peer_rel, restart_rel])
 
     # When
     with (patch("workload.Workload.read"), patch("workload.Workload.restart") as _restart):

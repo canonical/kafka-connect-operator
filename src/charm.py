@@ -177,7 +177,10 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         current_config = set(self.workload.read(self.workload.paths.worker_properties))
         diff = set(self.config_manager.properties) ^ current_config
 
-        if not any([diff, self.context.worker_unit.should_restart]):
+        if diff:
+            self.context.worker_unit.should_restart = True
+
+        if not self.context.worker_unit.should_restart:
             return
 
         if not self.context.ready:

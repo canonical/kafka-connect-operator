@@ -11,7 +11,7 @@ import pytest
 from charms.data_platform_libs.v0.data_interfaces import PLUGIN_URL_NOT_REQUIRED
 from ops.testing import Context, PeerRelation, Relation, State
 from src.charm import ConnectCharm
-from src.literals import CLIENT_REL, PEER_REL
+from src.literals import CLIENT_REL, KAFKA_CLIENT_REL, PEER_REL
 
 logger = logging.getLogger(__name__)
 
@@ -55,23 +55,26 @@ def test_update_plugins(ctx: Context, base_state: State, plugin_url) -> None:
     [PLUGIN_URL_NOT_REQUIRED, "mellon"],
     ids=[f"plugin_url {PLUGIN_URL_NOT_REQUIRED}", "pugin_url missing username"],
 )
-def test_config_changed_update_clients_data(ctx: Context, base_state: State, plugin_url) -> None:
+def test_config_changed_update_clients_data(
+    ctx: Context, base_state: State, plugin_url, kafka_client_rel, active_service, restart_rel
+) -> None:
     """Checks config-changed updates client relation data without plugin-url set."""
     # Given
-    relation_id = 7
     state_in = base_state
     client_rel = Relation(
         CLIENT_REL,
         CLIENT_REL,
-        id=relation_id,
         remote_app_data={"plugin-url": plugin_url},
     )
     peer_rel = PeerRelation(PEER_REL, PEER_REL, local_app_data={})
-    state_in = dataclasses.replace(base_state, relations=[peer_rel, client_rel])
+    kafka_rel = Relation(KAFKA_CLIENT_REL, KAFKA_CLIENT_REL, remote_app_data=kafka_client_rel)
+    state_in = dataclasses.replace(
+        base_state, relations=[client_rel, kafka_rel, peer_rel, restart_rel]
+    )
 
     # When
     with (
-        patch("core.models.RelationContext.update") as patched_update,
+        patch("core.models.ConnectClientContext.update") as patched_update,
         patch(
             "core.models.ConnectClientContext.password",
             new_callable=PropertyMock,
@@ -80,8 +83,9 @@ def test_config_changed_update_clients_data(ctx: Context, base_state: State, plu
     ):
         _ = ctx.run(ctx.on.config_changed(), state_in)
 
-        # Then
-        if plugin_url == PLUGIN_URL_NOT_REQUIRED:
-            assert patched_update.call_count
-        else:
-            assert not patched_update.call_count
+    print(patched_update.call_args)
+    # Then
+    if plugin_url == PLUGIN_URL_NOT_REQUIRED:
+        assert patched_update.call_count
+    else:
+        assert not patched_update.call_count

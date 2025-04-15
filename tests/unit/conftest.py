@@ -12,7 +12,7 @@ from ops import EventBase
 from ops.testing import Container, Context, PeerRelation, Resource, State
 from src.charm import ConnectCharm
 from src.core.workload import Paths
-from src.literals import CONTAINER, PLUGIN_RESOURCE_KEY, SNAP_NAME, SUBSTRATE
+from src.literals import CONTAINER, PEER_REL, PLUGIN_RESOURCE_KEY, SNAP_NAME, SUBSTRATE
 
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 ACTIONS = yaml.safe_load(Path("./actions.yaml").read_text())
@@ -118,14 +118,15 @@ def active_service():
 
 @pytest.fixture()
 def base_state(restart_rel):
+    peer_rel = PeerRelation(PEER_REL, PEER_REL)
     if SUBSTRATE == "k8s":
         state = State(
             leader=True,
             containers=[Container(name=CONTAINER, can_connect=True)],
-            relations=[restart_rel],
+            relations=[restart_rel, peer_rel],
         )
     else:
-        state = State(leader=True, relations=[restart_rel])
+        state = State(leader=True, relations=[restart_rel, peer_rel])
 
     return state
 

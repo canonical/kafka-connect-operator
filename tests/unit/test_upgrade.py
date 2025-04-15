@@ -49,6 +49,7 @@ def test_pre_upgrade_check_raises_not_healthy(ctx: Context, base_state: State) -
     # When
     with ctx(ctx.on.config_changed(), state_in) as manager:
         charm = cast(ConnectCharm, manager.charm)
+        charm.connect_manager.health_check = lambda: False
 
         with pytest.raises(ClusterNotReadyError):
             charm.upgrade.pre_upgrade_check()
