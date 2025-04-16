@@ -112,7 +112,7 @@ class ConnectProvider(Object):
         self.charm.connect_manager.remove_plugin(path_prefix=username)
 
         if self.charm.unit.is_leader():
-            self.charm.connect_manager.stop_connector(event.relation.id)
+            self.charm.connect_manager.delete_connector(event.relation.id)
 
         if self.charm.connect_manager.connector_status(event.relation.id) == TaskStatus.RUNNING:
             event.defer()
