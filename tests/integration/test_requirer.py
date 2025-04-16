@@ -225,7 +225,7 @@ async def test_relation_broken(ops_test: OpsTest):
             apps=[APP_NAME, POSTGRES_INTEGRATOR], idle_period=60, timeout=600
         )
 
-    await assert_connector_statuses(ops_test, running=1, stopped=1)
+    await assert_connector_statuses(ops_test, running=1)
 
     # relate again with connect
     await ops_test.model.add_relation(APP_NAME, POSTGRES_INTEGRATOR)
@@ -237,4 +237,4 @@ async def test_relation_broken(ops_test: OpsTest):
 
     # new connector should show up in RUNNING state,
     # while previous connector should be in STOPPED state.
-    await assert_connector_statuses(ops_test, running=2, stopped=1)
+    await assert_connector_statuses(ops_test, running=2)

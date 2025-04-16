@@ -392,6 +392,9 @@ class ConnectClient:
         )
 
         if response.status_code == 200:
+            logger.debug(
+                f"Connector {connector_name or self.connector_name} patched: {connector_config}"
+            )
             return
 
         logger.error(response.content)
