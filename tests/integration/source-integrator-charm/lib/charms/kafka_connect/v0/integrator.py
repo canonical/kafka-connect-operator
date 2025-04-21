@@ -711,7 +711,7 @@ class BaseIntegrator(ABC, Object):
             try:
                 self._client.start_connector(
                     connector_config=self.formatter.to_dict(
-                        charm_config=self.config, mode="source"
+                        charm_config=self.config, mode=self.mode
                     )
                     | self.dynamic_config[connector_name],
                     connector_name=connector_name,
@@ -724,7 +724,7 @@ class BaseIntegrator(ABC, Object):
         if not self.connector_names:
             try:
                 self._client.start_connector(
-                    self.formatter.to_dict(charm_config=self.config, mode="source")
+                    self.formatter.to_dict(charm_config=self.config, mode=self.mode)
                     | self.dynamic_config
                 )
             except ConnectApiError as e:
@@ -761,7 +761,7 @@ class BaseIntegrator(ABC, Object):
             try:
                 self._client.patch_connector(
                     connector_config=self.formatter.to_dict(
-                        charm_config=self.config, mode="source"
+                        charm_config=self.config, mode=self.mode
                     )
                     | self.dynamic_config[connector_name],
                     connector_name=connector_name,
@@ -774,7 +774,7 @@ class BaseIntegrator(ABC, Object):
         if not self.connector_names:
             try:
                 self._client.patch_connector(
-                    self.formatter.to_dict(charm_config=self.config, mode="source")
+                    self.formatter.to_dict(charm_config=self.config, mode=self.mode)
                     | self.dynamic_config
                 )
             except ConnectApiError as e:
