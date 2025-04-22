@@ -2,7 +2,7 @@ import logging
 import os
 import subprocess
 
-from charms.kafka_connect.v0.integrator import BasePluginServer
+from kafkacl import BasePluginServer
 
 logger = logging.getLogger(__name__)
 

@@ -6,5 +6,6 @@ platforms:
   ubuntu@22.04:amd64:
 parts:
   charm:
+    build-packages: [git]
     plugin: charm
 
