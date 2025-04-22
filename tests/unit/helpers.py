@@ -6,7 +6,8 @@
 from ops.testing import PeerRelation, Relation, State
 
 
-def get_relation(state: State, relation_name=str) -> Relation | PeerRelation:
+def get_relation(state: State, relation_name: str) -> Relation | PeerRelation:
+    """Returns the [Peer]Relation object from the provided State object."""
     for relation in state.relations:
         if relation.endpoint == relation_name:
             return relation
