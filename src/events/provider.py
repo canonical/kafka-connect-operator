@@ -12,7 +12,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
     IntegrationRequestedEvent,
     KafkaConnectProviderEventHandlers,
 )
-from charms.kafka_connect.v0.integrator import TaskStatus
+from kafkacl.models import TaskStatus
 from ops.charm import (
     RelationBrokenEvent,
     RelationChangedEvent,
