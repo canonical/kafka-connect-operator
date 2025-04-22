@@ -18,6 +18,7 @@ from src.charm import ConnectCharm
 from src.core.models import TLSContext
 from src.literals import PEER_REL, TLS_REL, Status
 from src.managers.tls import TLSManager
+from tests.unit.helpers import get_relation
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +54,14 @@ def test_tls_relation_created(ctx: Context, base_state: State, is_leader: bool) 
 
     # When
     state_out = ctx.run(ctx.on.relation_created(tls_rel), state_in)
+    peer_rel_out = get_relation(state_out, PEER_REL)
 
     # Then
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
     if is_leader:
-        assert peer_rel.local_app_data.get("tls") == "enabled"
+        assert peer_rel_out.local_app_data.get("tls") == "enabled"
     else:
-        assert not peer_rel.local_app_data.get("tls")
+        assert not peer_rel_out.local_app_data.get("tls")
 
 
 @pytest.mark.parametrize("is_leader", [True, False])
@@ -83,16 +85,17 @@ def test_tls_relation_broken(ctx: Context, base_state: State, is_leader: bool) -
 
     # When
     state_out = ctx.run(ctx.on.relation_broken(tls_rel), state_in)
+    peer_rel_out = get_relation(state_out, PEER_REL)
 
     # Then
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
     for key in TLSContext.KEYS:
-        assert not peer_rel.local_unit_data.get(key)
+        assert not peer_rel_out.local_unit_data.get(key)
 
     if is_leader:
-        assert not peer_rel.local_app_data.get("tls")
+        assert not peer_rel_out.local_app_data.get("tls")
     else:
-        assert peer_rel.local_app_data.get("tls") == "enabled"
+        assert peer_rel_out.local_app_data.get("tls") == "enabled"
 
 
 @pytest.mark.parametrize("is_leader", [True, False])
@@ -123,8 +126,6 @@ def test_tls_relation_joined(
     state_in = dataclasses.replace(base_state, relations=[tls_rel, peer_rel], leader=is_leader)
 
     # When
-    # state_out = ctx.run(ctx.on.relation_joined(tls_rel), state_in)
-
     with ctx(ctx.on.relation_joined(tls_rel), state_in) as mgr:
         charm: ConnectCharm = cast(ConnectCharm, mgr.charm)
         if tls_init_data:
@@ -184,12 +185,14 @@ def test_tls_certificate_available(
         state_out = mgr.run()
 
     # Then
+    peer_rel_out = get_relation(state_out, PEER_REL)
+
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
     tls_manager_mock.configure.assert_called_once()
-    assert peer_rel.local_unit_data.get(TLSContext.CERT, "")
-    assert peer_rel.local_unit_data.get(TLSContext.CA, "")
-    assert peer_rel.local_unit_data.get(TLSContext.CHAIN, "")
-    assert len(json.loads(peer_rel.local_unit_data.get(TLSContext.CHAIN, ""))) == len(chain)
+    assert peer_rel_out.local_unit_data.get(TLSContext.CERT, "")
+    assert peer_rel_out.local_unit_data.get(TLSContext.CA, "")
+    assert peer_rel_out.local_unit_data.get(TLSContext.CHAIN, "")
+    assert len(json.loads(peer_rel_out.local_unit_data.get(TLSContext.CHAIN, ""))) == len(chain)
 
 
 def test_tls_certificate_expiring(
@@ -266,17 +269,19 @@ def test_sans_change_leads_to_new_cert_request(
     with patch(
         "managers.tls.TLSManager.sans_change_detected", PropertyMock(return_value=sans_changed)
     ):
-        _ = ctx.run(ctx.on.config_changed(), state_in)
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+
+    peer_rel_out = get_relation(state_out, PEER_REL)
 
     if sans_changed:
-        assert peer_rel.local_unit_data.get(TLSContext.CSR, "")
-        assert peer_rel.local_unit_data.get(TLSContext.CSR, "") != "old-csr"
+        assert peer_rel_out.local_unit_data.get(TLSContext.CSR, "")
+        assert peer_rel_out.local_unit_data.get(TLSContext.CSR, "") != "old-csr"
         # cert is probably empty at this point, but we just care that old cert is not used anymore
-        assert peer_rel.local_unit_data.get(TLSContext.CERT, "") != tls_artifacts.cert.decode(
+        assert peer_rel_out.local_unit_data.get(TLSContext.CERT, "") != tls_artifacts.cert.decode(
             "utf-8"
         )
     else:
-        assert peer_rel.local_unit_data.get(TLSContext.CSR, "") == "old-csr"
-        assert peer_rel.local_unit_data.get(TLSContext.CERT, "") == tls_artifacts.cert.decode(
+        assert peer_rel_out.local_unit_data.get(TLSContext.CSR, "") == "old-csr"
+        assert peer_rel_out.local_unit_data.get(TLSContext.CERT, "") == tls_artifacts.cert.decode(
             "utf-8"
         )
