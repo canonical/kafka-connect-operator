@@ -33,6 +33,8 @@ package-mode = false
 python = ">=3.10,<4.0"
 ops = ">=2.17.0"
 
+kafkacl = { git = "https://github.com/canonical/kafkacl", branch = "dpe-6893" }
+
 # The cosl dep could be removed from here once PYDEPS is released:
 # https://github.com/canonical/charmcraft/pull/1003
 cosl = ">= 0.0.50"
