@@ -12,10 +12,10 @@ from charms.data_platform_libs.v0.data_interfaces import (
     IntegrationRequestedEvent,
     KafkaConnectProviderEventHandlers,
 )
-from kafkacl.models import TaskStatus
 from ops.charm import (
     RelationBrokenEvent,
     RelationChangedEvent,
+    RelationDepartedEvent,
     RelationJoinedEvent,
 )
 from ops.framework import Object
@@ -46,6 +46,9 @@ class ConnectProvider(Object):
         self.framework.observe(self.charm.on[CLIENT_REL].relation_broken, self._on_relation_broken)
         self.framework.observe(
             self.charm.on[CLIENT_REL].relation_changed, self._on_relation_changed
+        )
+        self.framework.observe(
+            self.charm.on[CLIENT_REL].relation_departed, self._on_relation_departed
         )
         self.framework.observe(self.charm.on[CLIENT_REL].relation_joined, self._on_relation_joined)
         self.framework.observe(
@@ -105,18 +108,17 @@ class ConnectProvider(Object):
         """Handler for `connect-client-relation-joined` event."""
         self.charm.on.config_changed.emit()
 
+    def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
+        """Handler for `connect-client-relation-departed` event."""
+        departing_app = event.departing_unit.app if event.departing_unit else None
+        if self.charm.unit.is_leader() and departing_app and departing_app != self.charm.app:
+            self.charm.connect_manager.delete_connector(event.relation.id)
+
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handler for `connect-client-relation-broken` event."""
         username = f"relation-{event.relation.id}"
         self.charm.auth_manager.remove_user(username)
         self.charm.connect_manager.remove_plugin(path_prefix=username)
-
-        if self.charm.unit.is_leader():
-            self.charm.connect_manager.delete_connector(event.relation.id)
-
-        if self.charm.connect_manager.connector_status(event.relation.id) == TaskStatus.RUNNING:
-            event.defer()
-            return
 
         self.context.worker_unit.should_restart = True
         self.charm.on.config_changed.emit()
