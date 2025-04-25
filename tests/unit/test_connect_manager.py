@@ -196,12 +196,12 @@ def test_connector_lifecycle_management(
 
         assert connect_manager.connector_status(12).value == expected_status[12]
 
-        connect_manager.stop_connector(12)
-        assert caplog.messages[-1] == "Successfully stopped connector for relation ID=12."
+        connect_manager.delete_connector(12)
+        assert caplog.messages[-1] == "Successfully deleted connector for relation ID=12."
 
         response.status_code = 500
-        connect_manager.stop_connector(12)
-        assert caplog.messages[-1].startswith("Unable to stop connector, details:")
+        connect_manager.delete_connector(12)
+        assert caplog.messages[-1].startswith("Unable to delete connector, details:")
 
 
 @pytest.mark.parametrize("status_code,correct_response", [(200, True), (500, False), (404, False)])
