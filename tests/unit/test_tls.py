@@ -18,7 +18,6 @@ from src.charm import ConnectCharm
 from src.core.models import TLSContext
 from src.literals import PEER_REL, TLS_REL, Status
 from src.managers.tls import TLSManager
-from tests.unit.helpers import get_relation
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ def test_tls_relation_created(ctx: Context, base_state: State, is_leader: bool) 
 
     # When
     state_out = ctx.run(ctx.on.relation_created(tls_rel), state_in)
-    peer_rel_out = get_relation(state_out, PEER_REL)
+    peer_rel_out = state_out.get_relation(peer_rel.id)
 
     # Then
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
@@ -85,7 +84,7 @@ def test_tls_relation_broken(ctx: Context, base_state: State, is_leader: bool) -
 
     # When
     state_out = ctx.run(ctx.on.relation_broken(tls_rel), state_in)
-    peer_rel_out = get_relation(state_out, PEER_REL)
+    peer_rel_out = state_out.get_relation(peer_rel.id)
 
     # Then
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
@@ -185,7 +184,7 @@ def test_tls_certificate_available(
         state_out = mgr.run()
 
     # Then
-    peer_rel_out = get_relation(state_out, PEER_REL)
+    peer_rel_out = state_out.get_relation(peer_rel.id)
 
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
     tls_manager_mock.configure.assert_called_once()
@@ -271,7 +270,7 @@ def test_sans_change_leads_to_new_cert_request(
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
 
-    peer_rel_out = get_relation(state_out, PEER_REL)
+    peer_rel_out = state_out.get_relation(peer_rel.id)
 
     if sans_changed:
         assert peer_rel_out.local_unit_data.get(TLSContext.CSR, "")

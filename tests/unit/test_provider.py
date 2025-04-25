@@ -11,7 +11,6 @@ from charms.data_platform_libs.v0.data_interfaces import (
 from ops.testing import Context, PeerRelation, Relation, Secret, State
 from src.charm import ConnectCharm
 from src.literals import CLIENT_REL, PEER_REL, Status
-from tests.unit.helpers import get_relation
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +57,8 @@ def test_integration_requested(
         else:
             assert charm.connect_manager.load_plugin_from_url.call_count
 
-    client_rel_out = get_relation(state_out, CLIENT_REL)
-    peer_rel_out = get_relation(state_out, PEER_REL)
+    client_rel_out = state_out.get_relation(client_rel.id)
+    peer_rel_out = state_out.get_relation(peer_rel.id)
 
     assert client_rel_out.local_app_data.get("username") == f"relation-{relation_id}"
     assert client_rel_out.local_app_data.get("password")
@@ -105,7 +104,7 @@ def test_provider_on_relation_changed(
 
     # Then
 
-    peer_rel_out = get_relation(state_out, PEER_REL)
+    peer_rel_out = state_out.get_relation(peer_rel.id)
 
     if initial_data:
         assert peer_rel_out.local_unit_data.get("restart") == "true"
