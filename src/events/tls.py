@@ -78,7 +78,7 @@ class TLSHandler(Object):
 
     def _tls_relation_broken(self, _) -> None:
         """Handler for `certificates_relation_broken` event."""
-        self.charm.context.worker_unit.update({key: "" for key in self.unit_tls_context.KEYS})
+        self.charm.context.worker_unit.update(dict.fromkeys(self.unit_tls_context.KEYS, ""))
 
         # remove all existing keystores from the unit so we don't preserve certs
         self.charm.tls_manager.remove_stores()

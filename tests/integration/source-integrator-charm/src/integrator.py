@@ -9,7 +9,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseRequirerData,
     DatabaseRequirerEventHandlers,
 )
-from charms.kafka_connect.v0.integrator import BaseConfigFormatter, BaseIntegrator, ConfigOption
+from kafkacl import BaseConfigFormatter, BaseIntegrator, ConfigOption
 from server import SimplePluginServer
 from typing_extensions import override
 

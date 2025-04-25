@@ -13,7 +13,7 @@ from subprocess import CalledProcessError
 from typing import Pattern
 
 import requests
-from charms.kafka_connect.v0.integrator import TaskStatus
+from kafkacl.models import TaskStatus
 from requests.auth import HTTPBasicAuth
 from tenacity import (
     retry,

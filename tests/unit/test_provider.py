@@ -57,9 +57,12 @@ def test_integration_requested(
         else:
             assert charm.connect_manager.load_plugin_from_url.call_count
 
-    assert client_rel.local_app_data.get("username") == f"relation-{relation_id}"
-    assert client_rel.local_app_data.get("password")
-    assert peer_rel.local_unit_data.get("restart") == "true"
+    client_rel_out = state_out.get_relation(client_rel.id)
+    peer_rel_out = state_out.get_relation(peer_rel.id)
+
+    assert client_rel_out.local_app_data.get("username") == f"relation-{relation_id}"
+    assert client_rel_out.local_app_data.get("password")
+    assert peer_rel_out.local_unit_data.get("restart") == "true"
     assert auth_manager_mock.update.call_count == 1
     assert state_out.unit_status == Status.MISSING_KAFKA.value.status
 
@@ -100,8 +103,11 @@ def test_provider_on_relation_changed(
         state_out = mgr.run()
 
     # Then
+
+    peer_rel_out = state_out.get_relation(peer_rel.id)
+
     if initial_data:
-        assert peer_rel.local_unit_data.get("restart") == "true"
+        assert peer_rel_out.local_unit_data.get("restart") == "true"
         assert charm.context.clients[relation_id].password == "password"
         assert auth_manager_mock.update.call_count > 0
 
