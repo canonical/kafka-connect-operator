@@ -172,22 +172,20 @@ def test_load_plugin_from_url(
         assert "Plugin already exists." in caplog.messages
 
 
-@pytest.mark.parametrize("healthy", [True, False])
 def test_connector_lifecycle_management(
-    connect_manager: ConnectManager, healthy: bool, caplog: pytest.LogCaptureFixture
+    connect_manager: ConnectManager, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Tests `connector_status` and `delete_connector` methods used for connector lifecycle management."""
-    with patch("requests.request") as _fake_request:
-        connect_manager.health_check = lambda: healthy
+    """Tests `connector_status` and `stop_connector` methods used for connector lifecycle management."""
+    with (patch("requests.request") as _fake_request,):
         response = MagicMock()
         response.json.return_value = STATUS_RESPONSE
         _fake_request.return_value = response
 
-        if not healthy:
-            assert not connect_manager.connectors
-            return
-        else:
-            assert len(connect_manager.connectors) == 3
+        health_response = MagicMock()
+        health_response.status_code = 200
+        connect_manager._get_health = lambda: health_response
+
+        assert len(connect_manager.connectors) == 3
 
         expected_status = {1: "UNKNOWN", 11: "STOPPED", 12: "RUNNING"}
 
@@ -206,20 +204,15 @@ def test_connector_lifecycle_management(
         assert caplog.messages[-1].startswith("Unable to delete connector, details:")
 
 
-@pytest.mark.parametrize("status_code", (200, 500))
-@pytest.mark.parametrize("bad_response", [True, False])
+@pytest.mark.parametrize("status_code,correct_response", [(200, True), (500, False), (404, False)])
 def test_health_check(
-    connect_manager: ConnectManager, status_code: int, bad_response: bool
+    connect_manager: ConnectManager, status_code: int, correct_response: bool
 ) -> None:
     """Tests ConnectManager health checking functionality."""
     with patch("requests.request") as _fake_request:
         response = MagicMock()
         response.status_code = status_code
-        response.json.return_value = (
-            {}
-            if status_code != 200 or bad_response
-            else {"kafka_cluster_id": "unique-id", "version": "3.9.0-ubuntu1"}
-        )
+        response.json.return_value = {}
         _fake_request.return_value = response
 
-        assert connect_manager.health_check() == (status_code == 200 and not bad_response)
+        assert bool(connect_manager.healthy) is correct_response

@@ -25,7 +25,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from core.models import Context
+from core.models import Context, HealthResponse
 from core.workload import WorkloadBase
 from literals import EMPTY_PLUGIN_CHECKSUM, GROUP, SUBSTRATE, USER
 
@@ -73,7 +73,7 @@ class ConnectManager:
     @property
     def connectors(self) -> dict[str, TaskStatus]:
         """Returns a mapping of connector names to their status."""
-        if not self.health_check():
+        if not self.healthy:
             return {}
 
         resp = self._request("GET", "/connectors?expand=status").json()
@@ -240,9 +240,9 @@ class ConnectManager:
             f"{self.workload.paths.plugins.rstrip('/')}/{path_prefix}*", glob=True
         )
 
-    def ping_connect_api(self) -> requests.Response:
-        """Makes a GET request to the unit's Connect API Endpoint and returns the response."""
-        return self._request("GET", "/")
+    def _get_health(self) -> requests.Response:
+        """Makes a GET request to the unit's Connect API /health Endpoint and returns the response."""
+        return self._request("GET", "/health")
 
     def connector_status(self, relation_id: int) -> TaskStatus:
         """Returns the managed connector status for given `relation_id`."""
@@ -266,25 +266,23 @@ class ConnectManager:
                 logger.error(f"Unable to delete connector, details: {resp.content}")
                 continue
 
+    @property
     @retry(
         wait=wait_fixed(3),
         stop=stop_after_attempt(5),
         retry=retry_any(
-            retry_if_result(lambda result: result is False), retry_if_exception(lambda _: True)
+            retry_if_result(lambda result: not result), retry_if_exception(lambda _: True)
         ),
-        retry_error_callback=lambda _: False,
+        retry_error_callback=lambda _: HealthResponse(status_code=-1),
     )
-    def health_check(self) -> bool:
+    def healthy(self) -> HealthResponse:
         """Checks the health of connect service by pinging the Connect API."""
-        response = self.ping_connect_api()
+        response = self._get_health()
 
-        if response.status_code != 200:
-            return False
+        if response.status_code in (200, 500, 503):
+            return HealthResponse(status_code=response.status_code, **response.json())
 
-        if self.KAFKA_CLUSTER_ID not in response.json():
-            return False
-
-        return True
+        return HealthResponse(status_code=response.status_code)
 
     def restart_worker(self) -> None:
         """Attempts to restart the connect worker."""

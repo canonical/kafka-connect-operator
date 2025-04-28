@@ -136,7 +136,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
 
         for _ in range(4):
             # shouldn't take longer than a minute
-            if self.connect_manager.health_check():
+            if self.connect_manager.healthy:
                 self.context.worker_unit.should_restart = False
                 return
 
