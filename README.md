@@ -2,7 +2,6 @@
 
 [![Release](https://github.com/canonical/kafka-connect-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/kafka-connect-operator/actions/workflows/release.yaml)
 [![Tests](https://github.com/canonical/kafka-connect-operator/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/canonical/kafka-connect-operator/actions/workflows/ci.yaml?query=branch%3Amain)
-[![Docs](https://github.com/canonical/kafka-connect-operator/actions/workflows/sync_docs.yaml/badge.svg)](https://github.com/canonical/kafka-connect-operator/actions/workflows/sync_docs.yaml)
 
 The Charmed Kafka Connect Operator delivers automated operations management from day 0 to day 2 on [Kafka Connect](https://kafka.apache.org/documentation/#connect).
 
@@ -10,7 +9,7 @@ This operator can be found on [Charmhub](https://charmhub.io/kafka-connect) and 
 
 - Automated or manual connector plugins management.
 - Fault-tolerance, replication and scalability out of the box.
-- Authenticaon on REST API enabled by default.
+- Authentication on REST API enabled by default.
 - TLS support both on the REST API and Apache Kafka cluster relations.
 - Seamless integration with Charmed Apache Kafka set of operators
 - Seamless integration with an ecosystem of of Integrator charms supporting common ETL tasks on different database technologies offered by [Canonical Data Platform](https://canonical.com/data).
@@ -23,15 +22,15 @@ Since Kafka Connect requires a running Apache Kafka cluster, this charmed operat
 
 Before using Charmed Kafka Connect, an Apache Kafka cluster needs to be deployed. The Charmed Apache Kafka operator can be deployed as follows:
 
-```shell
-$ juju deploy kafka --channel 3/edge -n 3 --config roles="broker,controller"
+```bash
+juju deploy kafka --channel 3/edge -n 3 --config roles="broker,controller"
 ```
 
 To deploy the Charmed Kafka Connect operator and relate it with the Apache Kafka cluster, use the following commands:
 
-```shell
-$ juju deploy kafka-connect --channel latest/edge
-$ juju integrate kafka-connect kafka
+```bash
+juju deploy kafka-connect --channel latest/edge
+juju integrate kafka-connect kafka
 ```
 
 To watch the process, `juju status` can be used. Once all the units show as `active|idle`, the Kafka Connect cluster is ready to be used.
@@ -42,7 +41,7 @@ Kafka Connect uses a pluggable architecture model, meaning that the user could a
 
 In the Charmed Kafka Connect operator, adding a plugin is as simple as calling the `juju attach-resource` command. Make sure that you bundle all required JAR files into a single TAR archive (for example, `my-plugin.tar`) and then use the following command:
 
-```shell
+```bash
 juju attach-resource kafka-connect connect-plugin=./my-plugin.tar
 ```
 
@@ -68,7 +67,7 @@ juju add-secret mysecret admin=adminpass
 
 You will receive a secret-id in response which looks like: 
 
-```bash
+```text
 secret:cvh7kruupa1s46bqvuig
 ```
 
@@ -92,7 +91,7 @@ curl -u admin:adminpass -X GET http://<kafka-connect-unit-ip>:8083/connector-plu
 
 You should get a response like below:
 
-```bash
+```text
 [
   {
     "class": "org.apache.kafka.connect.mirror.MirrorCheckpointConnector",
