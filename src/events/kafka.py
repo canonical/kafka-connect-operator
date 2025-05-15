@@ -13,7 +13,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 from ops.charm import RelationBrokenEvent, RelationChangedEvent, RelationCreatedEvent
 from ops.framework import Object
 
-from literals import KAFKA_CLIENT_REL, Status
+from literals import KAFKA_CLIENT_REL, TRUSTSTORE_PASSWORD_KEY, Status
 from managers.kafka import KafkaManager
 
 if TYPE_CHECKING:
@@ -59,15 +59,22 @@ class KafkaHandler(Object):
             # Import broker CA to truststore if not done.
             tls_context = self.context.worker_unit.tls
             if not tls_context.truststore_password:
+                truststore_password = self.charm.workload.generate_password()
+                self.charm.workload.write(
+                    f"{TRUSTSTORE_PASSWORD_KEY}={truststore_password}",
+                    self.charm.workload.paths.truststore_password,
+                )
                 self.charm.context.worker_unit.update(
-                    {tls_context.TRUSTSTORE_PASSWORD: self.charm.workload.generate_password()}
+                    {tls_context.TRUSTSTORE_PASSWORD: truststore_password}
                 )
 
-            self.charm.tls_manager.import_cert(
-                tls_context.BROKER_CA,
-                f"{tls_context.BROKER_CA}.pem",
-                cert_content=self.context.kafka_client.broker_ca,
-            )
+            # FIXME: uncomment when kafka-client relation sends the CA cert on "tls-ca" field. At
+            # the moment it sends "enabled" as value. Connect should have the same CA cert as Kafka
+            # self.charm.tls_manager.import_cert(
+            #     tls_context.BROKER_CA,
+            #     f"{tls_context.BROKER_CA}.pem",
+            #     cert_content=self.context.kafka_client.broker_ca,
+            # )
 
         self.charm.on.config_changed.emit()
 
