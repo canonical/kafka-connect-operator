@@ -15,7 +15,7 @@ parts:
       snap install rustup --classic
       rustup --version
       rustup set profile minimal
-      rustup default 1.83.0
+      rustup default 1.87.0
       craftctl default
     plugin: charm
 
