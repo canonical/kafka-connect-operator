@@ -58,15 +58,16 @@ class KafkaHandler(Object):
         if self.context.kafka_client.tls_enabled and self.context.kafka_client.broker_ca:
             # Import broker CA to truststore if not done.
             tls_context = self.context.worker_unit.tls
-            if not tls_context.truststore_password:
-                truststore_password = self.charm.workload.generate_password()
-                self.charm.workload.write(
-                    f"{TRUSTSTORE_PASSWORD_KEY}={truststore_password}",
-                    self.charm.workload.paths.truststore_password,
-                )
-                self.charm.context.worker_unit.update(
-                    {tls_context.TRUSTSTORE_PASSWORD: truststore_password}
-                )
+            truststore_password = (
+                tls_context.truststore_password or self.charm.workload.generate_password()
+            )
+            self.charm.workload.write(
+                f"{TRUSTSTORE_PASSWORD_KEY}={truststore_password}",
+                self.charm.workload.paths.truststore_password,
+            )
+            self.charm.context.worker_unit.update(
+                {tls_context.TRUSTSTORE_PASSWORD: truststore_password}
+            )
 
             # FIXME: uncomment when kafka-client relation sends the CA cert on "tls-ca" field. At
             # the moment it sends "enabled" as value. Connect should have the same CA cert as Kafka
