@@ -145,7 +145,7 @@ class TLSManager:
         """Add a certificate to the truststore."""
         if cert_content:
             self.workload.write(
-                content=cert_content, path=f"{self.workload.paths.config_dir}/{filename}.pem"
+                content=cert_content, path=f"{self.workload.paths.config_dir}/{filename}"
             )
 
         command = f"{self.keytool} -import -v -alias {alias} -file {filename} -keystore {self.workload.paths.truststore} -storepass {self.tls_context.truststore_password} -noprompt"

@@ -131,6 +131,9 @@ def test_tls_relation_joined(
             charm.context.worker_unit.update(tls_init_data)
         state_out = mgr.run()
 
+        assert mgr.charm.workload.write.call_count == 1
+        assert mgr.charm.workload.write.call_args_list[0][0][0].startswith("truststore=")
+
     secret_contents = {
         k: v for secret in state_out.secrets for k, v in secret.latest_content.items()
     }

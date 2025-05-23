@@ -44,6 +44,10 @@ EMPTY_PLUGIN_CHECKSUM = "84ff92691f909a05b224e1c56abb4864f01b4f8e3c854e4bb4c7baf
 TOPICS = {"offset": "connect-offset", "config": "connect-config", "status": "connect-status"}
 REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
 
+# NOTE: This key is used on a file to set the truststore password. The mirrormaker integrator charm
+# then points to this file to avoid sending the password over the API request config.
+TRUSTSTORE_PASSWORD_KEY = "truststore"
+
 # Relations
 KAFKA_CLIENT_REL = "kafka-client"
 PEER_REL = "worker"

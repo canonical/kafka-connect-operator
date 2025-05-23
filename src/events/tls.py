@@ -16,7 +16,7 @@ from charms.tls_certificates_interface.v3.tls_certificates import (
 )
 from ops.framework import Object
 
-from literals import TLS_REL
+from literals import TLS_REL, TRUSTSTORE_PASSWORD_KEY
 
 if TYPE_CHECKING:
     from charm import ConnectCharm
@@ -63,14 +63,20 @@ class TLSHandler(Object):
     def _tls_relation_joined(self, _) -> None:
         """Handler for `certificates_relation_joined` event."""
         # generate unit private key if not already created by action
+        truststore_password = (
+            self.unit_tls_context.truststore_password or self.charm.workload.generate_password()
+        )
+        self.charm.workload.write(
+            f"{TRUSTSTORE_PASSWORD_KEY}={truststore_password}",
+            self.charm.workload.paths.truststore_password,
+        )
         self.charm.context.worker_unit.update(
             {
                 self.unit_tls_context.PRIVATE_KEY: self.unit_tls_context.private_key
                 or generate_private_key().decode("utf-8"),
                 self.unit_tls_context.KEYSTORE_PASSWORD: self.unit_tls_context.keystore_password
                 or self.charm.workload.generate_password(),
-                self.unit_tls_context.TRUSTSTORE_PASSWORD: self.unit_tls_context.truststore_password
-                or self.charm.workload.generate_password(),
+                self.unit_tls_context.TRUSTSTORE_PASSWORD: truststore_password,
             }
         )
 

@@ -72,6 +72,11 @@ class Paths:
         return f"{self.config_dir}/truststore.jks"
 
     @property
+    def truststore_password(self) -> str:
+        """Path to truststore password file."""
+        return f"{self.config_dir}/truststore.password"
+
+    @property
     def passwords(self) -> str:
         """Path to passwords file store when using PropertyFileLoginModule."""
         return f"{self.config_dir}/connect.password"
