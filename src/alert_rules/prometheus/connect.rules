@@ -4,14 +4,17 @@ groups:
   # ==============
   # Base JMX Rules
   # ==============
-  - alert: KafkaConnectDown
-    expr: up{juju_application="kafka-connect"} == 0
+  - alert: HostDown
+    expr: up < 1
     for: 2m
     labels:
       severity: critical
-    annotations:
-      summary: "Kafka Connect is down"
       description: "Kafka Connect application is not responding for more than 2 minutes."
+  - alert: HostMetricsMissing
+    expr: absent(up)
+    for: 5m
+    labels:
+      severity: critical
   - alert: JVM Memory Filling Up
     expr: (sum by (instance)(jvm_memory_bytes_used{area="heap",juju_charm!=".*"}) / sum by (instance)(jvm_memory_bytes_max{area="heap",juju_charm!=".*"})) * 100 > 80
     for: 2m
@@ -40,7 +43,7 @@ groups:
     expr: kafka_connect_connector_task_status{status="failed"} > 0
     for: 1m
     labels:
-      severity: warning
+      severity: critical
     annotations:
       summary: "Kafka Connect task failed"
       description: "One or more tasks for connector {{ $labels.connector }} have failed."
