@@ -69,13 +69,13 @@ class KafkaHandler(Object):
                 {tls_context.TRUSTSTORE_PASSWORD: truststore_password}
             )
 
-            # FIXME: uncomment when kafka-client relation sends the CA cert on "tls-ca" field. At
-            # the moment it sends "enabled" as value. Connect should have the same CA cert as Kafka
-            # self.charm.tls_manager.import_cert(
-            #     tls_context.BROKER_CA,
-            #     f"{tls_context.BROKER_CA}.pem",
-            #     cert_content=self.context.kafka_client.broker_ca,
-            # )
+            # Compatibility: Kafka 3 sends `enabled` on `tls-ca` field.
+            if self.charm.context.kafka_client.broker_ca != "enabled":
+                self.charm.tls_manager.import_cert(
+                    tls_context.BROKER_CA,
+                    f"{tls_context.BROKER_CA}.pem",
+                    cert_content=self.context.kafka_client.broker_ca,
+                )
 
         self.charm.on.config_changed.emit()
 
