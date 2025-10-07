@@ -4,17 +4,6 @@ groups:
   # ==============
   # Base JMX Rules
   # ==============
-  - alert: HostDown
-    expr: up < 1
-    for: 2m
-    labels:
-      severity: critical
-      description: "Kafka Connect application is not responding for more than 2 minutes."
-  - alert: HostMetricsMissing
-    expr: absent(up)
-    for: 5m
-    labels:
-      severity: critical
   - alert: JVM Memory Filling Up
     expr: (sum by (instance)(jvm_memory_bytes_used{area="heap",juju_charm!=".*"}) / sum by (instance)(jvm_memory_bytes_max{area="heap",juju_charm!=".*"})) * 100 > 80
     for: 2m
