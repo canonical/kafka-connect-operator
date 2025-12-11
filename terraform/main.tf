@@ -1,14 +1,14 @@
 resource "juju_application" "connect" {
   model = var.model
   name  = var.app_name
-  
+
   charm {
     name     = "kafka-connect"
     channel  = var.channel
     revision = var.revision
     base     = var.base
   }
-  
+
   units       = var.units
   constraints = var.constraints
   config      = var.config

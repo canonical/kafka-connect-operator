@@ -7,7 +7,7 @@ variable "app_name" {
 variable "channel" {
   description = "Charm channel to deploy from"
   type        = string
-  default = "latest/edge"
+  default     = "latest/edge"
 }
 
 variable "config" {
@@ -22,8 +22,8 @@ variable "constraints" {
   default     = "arch=amd64"
 }
 
-variable "model" {
-  description = "Juju model to deploy to"
+variable "model_uuid" {
+  description = "Juju model UUID to deploy to"
   type        = string
 }
 
