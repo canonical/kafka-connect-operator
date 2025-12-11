@@ -20,6 +20,7 @@ from literals import CONFIG_DIR
 logger = logging.getLogger(__name__)
 
 TLS_APP = "self-signed-certificates"
+TLS_CHANNEL = "1/stable"
 TLS_CONFIG = {"ca-common-name": "kafka"}
 
 
@@ -29,7 +30,9 @@ async def test_deploy_tls(ops_test: OpsTest, kafka_connect_charm):
 
     await asyncio.gather(
         ops_test.model.deploy(
-            TLS_APP, channel="stable", config=TLS_CONFIG, series="jammy", revision=155
+            TLS_APP,
+            channel=TLS_CHANNEL,
+            config=TLS_CONFIG,
         ),
         ops_test.model.deploy(
             kafka_connect_charm,
