@@ -1,6 +1,6 @@
 resource "juju_application" "connect" {
-  model = var.model
-  name  = var.app_name
+  model_uuid = var.model_uuid
+  name       = var.app_name
 
   charm {
     name     = "kafka-connect"
@@ -15,7 +15,7 @@ resource "juju_application" "connect" {
 }
 
 resource "juju_offer" "connect_client" {
-  model            = var.model
+  model_uuid       = var.model_uuid
   application_name = juju_application.connect.name
   endpoints        = ["connect-client"]
 }
