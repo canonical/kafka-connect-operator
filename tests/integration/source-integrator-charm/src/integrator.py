@@ -58,7 +58,7 @@ class Integrator(BaseIntegrator):
         super().__init__(charm, plugin_server_args, plugin_server_kwargs)
 
         self.database_requirer_data = DatabaseRequirerData(
-            self.model, self.DB_CLIENT_REL, self.DB_NAME, extra_user_roles="admin"
+            self.model, self.DB_CLIENT_REL, self.DB_NAME, extra_user_roles="charmed_dba"
         )
         self.database = DatabaseRequirerEventHandlers(self.charm, self.database_requirer_data)
 
