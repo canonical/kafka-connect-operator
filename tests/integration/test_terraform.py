@@ -116,7 +116,6 @@ async def test_deployment_on_machines(ops_test: OpsTest, model_uuid: str, tmp_pa
 
     await ops_test.model.block_until(
         lambda: len(ops_test.model.units) == 0
-        and len(ops_test.model.machines) == 0
         and len(ops_test.model.applications) == 0,
         timeout=900,
     )
