@@ -45,3 +45,9 @@ variable "base" {
   type        = string
   default     = "ubuntu@22.04"
 }
+
+variable "machines" {
+  description = "List of juju_machine resources to use for deployment"
+  type        = set(string)
+  default     = []
+}
