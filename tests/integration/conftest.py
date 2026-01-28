@@ -90,6 +90,6 @@ async def model_uuid(ops_test: OpsTest) -> str:
         iter(
             mdl["model-uuid"]
             for mdl in json.loads(models_raw)["models"]
-            if mdl["short-name"] == ops_test.model_full_name
+            if mdl["short-name"] == ops_test.model.name
         )
     )
