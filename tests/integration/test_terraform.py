@@ -115,7 +115,6 @@ async def test_deployment_on_machines(ops_test: OpsTest, model_uuid: str, tmp_pa
     _destroy_terraform(working_dir)
 
     await ops_test.model.block_until(
-        lambda: len(ops_test.model.units) == 0
-        and len(ops_test.model.applications) == 0,
+        lambda: len(ops_test.model.units) == 0 and len(ops_test.model.applications) == 0,
         timeout=900,
     )
