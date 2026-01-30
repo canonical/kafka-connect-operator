@@ -69,6 +69,7 @@ jobs:
           - integration-requirer
           - integration-scaling
           - integration-secrets
+          - integration-terraform
 
     name: ${{ matrix.tox-environments }}
     needs:
@@ -91,6 +92,10 @@ jobs:
         with:
           pattern: ${{ needs.build.outputs.artifact-prefix }}-*
           merge-multiple: true
+      - name: Setup terraform if needed
+        if: ${{ matrix.tox-environments == 'integration-terraform' }}
+        run: |
+          sudo snap install --classic terraform
       - name: Select tests
         id: select-tests
         run: |

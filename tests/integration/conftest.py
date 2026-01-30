@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 
+import json
 import random
 import string
 from typing import cast
@@ -79,3 +80,16 @@ async def mysql_test_data(ops_test: OpsTest, request: pytest.FixtureRequest):
         await exec_query(
             f"INSERT INTO {params.db_name}.table_{i} (name, price) Values {', '.join(values)}"
         )
+
+
+@pytest.fixture(scope="module")
+async def model_uuid(ops_test: OpsTest) -> str:
+    ret, models_raw, _ = await ops_test.juju("models", "--format", "json")
+    assert not ret
+    return next(
+        iter(
+            mdl["model-uuid"]
+            for mdl in json.loads(models_raw)["models"]
+            if mdl["short-name"] == ops_test.model.name
+        )
+    )
