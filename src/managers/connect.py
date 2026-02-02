@@ -209,6 +209,7 @@ class ConnectManager:
 
         load_path = self._create_plugin_dir(resource_path, path_prefix=path_prefix)
         self._untar_plugin(resource_path, load_path)
+        self.workload.exec(["chown", "-R", f"{USER}:{GROUP}", f"{load_path}"])
         self.workload.rmdir(f"{resource_path}")
         self.reload_plugins()
         self.context.worker_unit.should_restart = True
