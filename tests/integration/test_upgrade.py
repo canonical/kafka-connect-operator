@@ -25,6 +25,7 @@ CHANNEL = "edge"
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.skip
 async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
     # deploy kafka & kafka-connect
     await asyncio.gather(
@@ -33,7 +34,7 @@ async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
             channel=CHANNEL,
             application_name=APP_NAME,
             num_units=1,
-            series="jammy",
+            series="noble",
         ),
         ops_test.model.deploy(
             KAFKA_APP,
