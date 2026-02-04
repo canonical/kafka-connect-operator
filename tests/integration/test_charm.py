@@ -30,7 +30,7 @@ async def test_deploy_charms(ops_test: OpsTest, kafka_connect_charm):
             kafka_connect_charm,
             application_name=APP_NAME,
             num_units=1,
-            series="jammy",
+            series="noble",
             config={"profile": "testing"},
         ),
         ops_test.model.deploy(
