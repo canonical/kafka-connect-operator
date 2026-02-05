@@ -6,7 +6,7 @@ import pytest
 from helpers import (
     APP_NAME,
     KAFKA_APP,
-    KAFKA_CHANNEL,
+    deploy_kafka,
     make_connect_api_request,
 )
 from pytest_operator.plugin import OpsTest
@@ -24,7 +24,7 @@ CUSTOM_AUTH = {INTERNAL_USER: "adminpass", "user1": "user1pass", "user2": "user2
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
+async def test_build_and_deploy(ops_test: OpsTest, kafka_version: int, kafka_connect_charm):
     """Deploys kafka-connect charm along kafka (in KRaft mode)."""
     await asyncio.gather(
         ops_test.model.deploy(
@@ -35,14 +35,7 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
             series="noble",
             config={"profile": "testing"},
         ),
-        ops_test.model.deploy(
-            KAFKA_APP,
-            channel=KAFKA_CHANNEL,
-            application_name=KAFKA_APP,
-            num_units=1,
-            series="jammy",
-            config={"roles": "broker,controller"},
-        ),
+        deploy_kafka(ops_test, kafka_version),
     )
 
     await ops_test.model.add_relation(APP_NAME, KAFKA_APP)
