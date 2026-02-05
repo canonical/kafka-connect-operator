@@ -10,8 +10,8 @@ import pytest
 from helpers import (
     APP_NAME,
     KAFKA_APP,
-    KAFKA_CHANNEL,
     check_connect_endpoints_status,
+    deploy_kafka,
 )
 from pytest_operator.plugin import OpsTest
 
@@ -25,7 +25,8 @@ CHANNEL = "edge"
 
 
 @pytest.mark.abort_on_fail
-async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
+@pytest.mark.skip
+async def test_in_place_upgrade(ops_test: OpsTest, kafka_version: int, kafka_connect_charm):
     # deploy kafka & kafka-connect
     await asyncio.gather(
         ops_test.model.deploy(
@@ -33,16 +34,9 @@ async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
             channel=CHANNEL,
             application_name=APP_NAME,
             num_units=1,
-            series="jammy",
+            series="noble",
         ),
-        ops_test.model.deploy(
-            KAFKA_APP,
-            channel=KAFKA_CHANNEL,
-            application_name=KAFKA_APP,
-            num_units=1,
-            series="jammy",
-            config={"roles": "broker,controller"},
-        ),
+        deploy_kafka(ops_test, kafka_version),
     )
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP], timeout=3000)

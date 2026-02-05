@@ -70,8 +70,14 @@ jobs:
           - integration-scaling
           - integration-secrets
           - integration-terraform
-
-    name: ${{ matrix.tox-environments }}
+        kafka-version:
+          - "3"
+          - "4"
+        exclude:
+          # TF tests don't involve Kafka
+          - tox-environments: integration-terraform
+            kafka-version: 3
+    name: ${{ matrix.tox-environments }} | Kafka ${{ matrix.kafka-version }}
     needs:
       - lint
       - unit-test
@@ -108,6 +114,6 @@ jobs:
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --kafka ${{ matrix.kafka-version }}
         env:
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
