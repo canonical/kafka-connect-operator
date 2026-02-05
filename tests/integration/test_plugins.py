@@ -43,7 +43,7 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
             application_name=APP_NAME,
             resources={PLUGIN_RESOURCE_KEY: "./tests/integration/resources/FakeResource.tar"},
             num_units=1,
-            series="jammy",
+            series="noble",
             config={"profile": "testing"},
         ),
         ops_test.model.deploy(
