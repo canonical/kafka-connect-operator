@@ -7,10 +7,10 @@ from helpers import (
     APP_NAME,
     JDBC_CONNECTOR_DOWNLOAD_LINK,
     KAFKA_APP,
-    KAFKA_CHANNEL,
     MYSQL_APP,
     MYSQL_CHANNEL,
     DatabaseFixtureParams,
+    deploy_kafka,
     destroy_active_workers,
     download_file,
     get_unit_ipv4_address,
@@ -29,7 +29,7 @@ INTEGRATOR = "integrator"
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
+async def test_build_and_deploy(ops_test: OpsTest, kafka_version: int, kafka_connect_charm):
     """Deploys kafka-connect charm along kafka (in KRaft mode) & MySQL."""
     await asyncio.gather(
         ops_test.model.deploy(
@@ -40,14 +40,7 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
             series="noble",
             # config={"profile": "testing"},
         ),
-        ops_test.model.deploy(
-            KAFKA_APP,
-            channel=KAFKA_CHANNEL,
-            application_name=KAFKA_APP,
-            num_units=1,
-            series="jammy",
-            config={"roles": "broker,controller"},
-        ),
+        deploy_kafka(ops_test, kafka_version),
         ops_test.model.deploy(
             MYSQL_APP,
             channel=MYSQL_CHANNEL,
