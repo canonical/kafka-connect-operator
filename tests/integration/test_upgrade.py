@@ -33,14 +33,14 @@ async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
             channel=CHANNEL,
             application_name=APP_NAME,
             num_units=1,
-            series="jammy",
+            series="noble",
         ),
         ops_test.model.deploy(
             KAFKA_APP,
             channel=KAFKA_CHANNEL,
             application_name=KAFKA_APP,
             num_units=1,
-            series="jammy",
+            series="noble",
             config={"roles": "broker,controller"},
         ),
     )

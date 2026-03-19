@@ -39,7 +39,7 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
         ops_test.model.deploy(
             kafka_connect_charm,
             application_name=APP_NAME,
-            series="jammy",
+            series="noble",
             config={"profile": "testing"},
         ),
         ops_test.model.deploy(
@@ -47,7 +47,7 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
             channel=KAFKA_CHANNEL,
             application_name=KAFKA_APP,
             num_units=1,
-            series="jammy",
+            series="noble",
             config={"roles": "broker,controller"},
         ),
         ops_test.model.deploy(
@@ -55,14 +55,14 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
             channel=MYSQL_CHANNEL,
             application_name=MYSQL_APP,
             num_units=1,
-            series="jammy",
+            series="noble",
         ),
         ops_test.model.deploy(
             POSTGRES_APP,
             channel=POSTGRES_CHANNEL,
             application_name=POSTGRES_APP,
             num_units=1,
-            series="jammy",
+            series="noble",
         ),
     )
 
