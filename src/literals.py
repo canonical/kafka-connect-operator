@@ -12,7 +12,7 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 
 CHARM_KEY = "kafka-connect"
 SNAP_NAME = "charmed-kafka"
-CHARMED_KAFKA_SNAP_REVISION = "57"
+CHARMED_KAFKA_SNAP_REVISION = "67"
 CONTAINER = "kafka-connect"
 SUBSTRATE = "vm"
 
