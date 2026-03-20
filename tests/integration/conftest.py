@@ -10,11 +10,22 @@ from typing import cast
 
 import pytest
 from helpers import DatabaseFixtureParams
-from pytest_operator.plugin import OpsTest
+from jubilant_adapters import JujuFixture, temp_model_fixture
 
 
 def pytest_addoption(parser):
     """Defines pytest parsers."""
+    parser.addoption(
+        "--model",
+        action="store",
+        help="Juju model to use; if not provided, a new model "
+        "will be created for each test which requires one",
+    )
+    parser.addoption(
+        "--keep-models",
+        action="store_true",
+        help="Keep models handled by opstest, can be overridden in track_model",
+    )
     parser.addoption("--kafka", action="store", help="Kafka version", default="3")
 
 
@@ -29,54 +40,79 @@ def kafka_version(request: pytest.FixtureRequest) -> int:
 
 
 @pytest.fixture(scope="module")
-async def kafka_connect_charm(ops_test: OpsTest):
+def juju(request: pytest.FixtureRequest):
+    """Pytest fixture that wraps :meth:`jubilant.with_model`.
+
+    This adds command line parameter ``--keep-models`` (see help for details).
+    """
+    model = request.config.getoption("--model")
+    keep_models = bool(request.config.getoption("--keep-models"))
+
+    if model:
+        juju = JujuFixture(model=model)
+        yield juju
+    else:
+        with temp_model_fixture(keep=keep_models) as juju:
+            yield juju
+
+
+@pytest.fixture(scope="module", autouse=True)
+def switch_model(juju: JujuFixture):
+    if not juju.model:
+        return
+
+    juju.cli("switch", juju.model, include_model=False)
+
+
+@pytest.fixture(scope="module")
+def kafka_connect_charm(juju: JujuFixture):
     """Build the application charm."""
     charm_path = "."
-    charm = await ops_test.build_charm(charm_path)
+    charm = juju.ext.build_charm(charm_path)
     return charm
 
 
 @pytest.fixture(scope="module")
-async def source_integrator_charm(ops_test: OpsTest):
+def source_integrator_charm(juju: JujuFixture):
     """Build the source (MySQL) integrator charm."""
     charm_path = "./tests/integration/source-integrator-charm"
-    charm = await ops_test.build_charm(charm_path)
+    charm = juju.ext.build_charm(charm_path)
     return charm
 
 
 @pytest.fixture(scope="module")
-async def sink_integrator_charm(ops_test: OpsTest):
+def sink_integrator_charm(juju: JujuFixture):
     """Build the sink (PostgreSQL) integrator charm."""
     charm_path = "./tests/integration/sink-integrator-charm"
-    charm = await ops_test.build_charm(charm_path)
+    charm = juju.ext.build_charm(charm_path)
     return charm
 
 
 @pytest.fixture(scope="function")
-async def mysql_test_data(ops_test: OpsTest, request: pytest.FixtureRequest):
+def mysql_test_data(juju: JujuFixture, request: pytest.FixtureRequest):
     """Loads a MySQL database with test data using the client shipped with MySQL charm.
 
     Tables are named table_{i}, i starting from 1 to param.no_tables.
     """
     params = cast(DatabaseFixtureParams, request.param)
 
-    mysql_leader = ops_test.model.applications[params.app_name].units[0]
-    get_pass_action = await mysql_leader.run_action("get-password", mode="full", dryrun=False)
-    response = await get_pass_action.wait()
+    mysql_leader = juju.ext.model.applications[params.app_name].units[0]
+    get_pass_action = mysql_leader.run_action("get-password", mode="full", dryrun=False)
+    response = get_pass_action.wait()
 
     mysql_root_pass = response.results.get("password")
 
-    async def exec_query(query: str):
+    def exec_query(query: str):
         query = query.replace("\n", " ")
         cmd = f'mysql -h 127.0.0.1 -u root -p{mysql_root_pass} -e "{query}"'
         # print a truncated output
         print(cmd.replace(mysql_root_pass, "******")[:1000])
-        return_code, _, _ = await ops_test.juju("ssh", f"{mysql_leader.name}", cmd)
+        return_code, _, _ = juju.juju("ssh", f"{mysql_leader.name}", cmd)
         assert return_code == 0
 
     for i in range(1, params.no_tables + 1):
 
-        await exec_query(
+        exec_query(
             f"""CREATE TABLE {params.db_name}.table_{i} (
             id int NOT NULL AUTO_INCREMENT,
             name varchar(50) DEFAULT NULL,
@@ -92,19 +128,19 @@ async def mysql_test_data(ops_test: OpsTest, request: pytest.FixtureRequest):
             random_price = float(random.randint(10, 1000))
             values.append(f"('{random_name}', {random_price})")
 
-        await exec_query(
+        exec_query(
             f"INSERT INTO {params.db_name}.table_{i} (name, price) Values {', '.join(values)}"
         )
 
 
 @pytest.fixture(scope="module")
-async def model_uuid(ops_test: OpsTest) -> str:
-    ret, models_raw, _ = await ops_test.juju("models", "--format", "json")
+def model_uuid(juju: JujuFixture) -> str:
+    ret, models_raw, _ = juju.juju("models", "--format", "json")
     assert not ret
     return next(
         iter(
             mdl["model-uuid"]
             for mdl in json.loads(models_raw)["models"]
-            if mdl["short-name"] == ops_test.model.name
+            if mdl["short-name"] == juju.model
         )
     )

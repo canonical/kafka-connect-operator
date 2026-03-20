@@ -3,15 +3,13 @@
 # See LICENSE file for licensing details.
 
 """Simple Terraform smoke tests."""
-
 import json
 import logging
 import os
 import random
 
-import pytest
 from helpers import APP_NAME
-from pytest_operator.plugin import OpsTest
+from jubilant_adapters import JujuFixture
 
 from literals import Status
 
@@ -56,42 +54,38 @@ def _destroy_terraform(working_dir: str) -> None:
     os.system(f"rm -rf {working_dir}")
 
 
-@pytest.mark.abort_on_fail
-async def test_deployment_active(ops_test: OpsTest, model_uuid: str, tmp_path):
+def test_deployment_active(juju: JujuFixture, model_uuid: str, tmp_path):
     """Test that application is deployed and active."""
     working_dir = _deploy_terraform(tmp_path, tfvars={"model_uuid": model_uuid})
 
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], idle_period=30, timeout=900, status="blocked"
-    )
+    juju.ext.model.wait_for_idle(apps=[APP_NAME], idle_period=30, timeout=900, status="blocked")
     assert (
-        ops_test.model.applications[APP_NAME].status_message
+        juju.ext.model.applications[APP_NAME].status_message
         == Status.MISSING_KAFKA.value.status.message
     )
 
     _destroy_terraform(working_dir)
 
-    await ops_test.model.block_until(
-        lambda: len(ops_test.model.units) == 0
-        and len(ops_test.model.machines) == 0
-        and len(ops_test.model.applications) == 0,
+    juju.ext.model.block_until(
+        lambda: len(juju.ext.model.units) == 0
+        and len(juju.ext.model.machines) == 0
+        and len(juju.ext.model.applications) == 0,
         timeout=900,
     )
 
 
-@pytest.mark.abort_on_fail
-async def test_deployment_on_machines(ops_test: OpsTest, model_uuid: str, tmp_path):
+def test_deployment_on_machines(juju: JujuFixture, model_uuid: str, tmp_path):
     """Test that `machines` TF variable work as expected."""
     # Add machines and wait for them to start
-    await ops_test.juju("add-machine", "--base", "ubuntu@22.04", "-n", "3")
+    juju.juju("add-machine", "--base", "ubuntu@22.04", "-n", "3")
 
-    await ops_test.model.block_until(
-        lambda: len(ops_test.model.machines) == 3
-        and {machine.agent_status for machine in ops_test.model.machines.values()} == {"started"},
+    juju.ext.model.block_until(
+        lambda: len(juju.ext.model.machines) == 3
+        and {machine.agent_status for machine in juju.ext.model.machines.values()} == {"started"},
         timeout=900,
     )
 
-    machines = list(ops_test.model.machines)
+    machines = list(juju.ext.model.machines)
     target_machine = random.choice(machines)
 
     # Deploy 1 unit on a target machine
@@ -99,22 +93,20 @@ async def test_deployment_on_machines(ops_test: OpsTest, model_uuid: str, tmp_pa
         tmp_path, tfvars={"model_uuid": model_uuid, "machines": [target_machine]}
     )
 
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], idle_period=30, timeout=900, status="blocked"
-    )
+    juju.ext.model.wait_for_idle(apps=[APP_NAME], idle_period=30, timeout=900, status="blocked")
     assert (
-        ops_test.model.applications[APP_NAME].status_message
+        juju.ext.model.applications[APP_NAME].status_message
         == Status.MISSING_KAFKA.value.status.message
     )
 
-    status = ops_test.model.applications
+    status = juju.ext.model.applications
     assert len(status[APP_NAME].units) == 1
     deployed_unit = next(iter(status[APP_NAME].units))
     assert deployed_unit.machine.id == target_machine
 
     _destroy_terraform(working_dir)
 
-    await ops_test.model.block_until(
-        lambda: len(ops_test.model.units) == 0 and len(ops_test.model.applications) == 0,
+    juju.ext.model.block_until(
+        lambda: len(juju.ext.model.units) == 0 and len(juju.ext.model.applications) == 0,
         timeout=900,
     )

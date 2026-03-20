@@ -2,7 +2,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
 import logging
 import time
 
@@ -13,7 +12,7 @@ from helpers import (
     check_connect_endpoints_status,
     deploy_kafka,
 )
-from pytest_operator.plugin import OpsTest
+from jubilant_adapters import JujuFixture, gather
 
 from literals import DEFAULT_API_PORT
 
@@ -24,47 +23,45 @@ pytestmark = pytest.mark.broker
 CHANNEL = "edge"
 
 
-@pytest.mark.abort_on_fail
-@pytest.mark.skip
-async def test_in_place_upgrade(ops_test: OpsTest, kafka_version: int, kafka_connect_charm):
+def test_in_place_upgrade(juju: JujuFixture, kafka_version: int, kafka_connect_charm):
     # deploy kafka & kafka-connect
-    await asyncio.gather(
-        ops_test.model.deploy(
+    gather(
+        juju.ext.model.deploy(
             APP_NAME,
             channel=CHANNEL,
             application_name=APP_NAME,
             num_units=1,
             series="noble",
         ),
-        deploy_kafka(ops_test, kafka_version),
+        deploy_kafka(juju, kafka_version),
     )
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP], timeout=3000)
+    juju.ext.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP], timeout=3000)
 
-    assert ops_test.model.applications[KAFKA_APP].status == "active"
-    assert ops_test.model.applications[APP_NAME].status == "blocked"
+    assert juju.ext.model.applications[KAFKA_APP].status == "active"
+    assert juju.ext.model.applications[APP_NAME].status == "blocked"
 
-    await ops_test.model.add_relation(APP_NAME, KAFKA_APP)
+    juju.ext.model.add_relation(APP_NAME, KAFKA_APP)
 
-    async with ops_test.fast_forward(fast_interval="60s"):
-        await ops_test.model.wait_for_idle(
+    with juju.ext.fast_forward(fast_interval="60s"):
+        juju.ext.model.wait_for_idle(
             apps=[APP_NAME, KAFKA_APP], idle_period=60, timeout=1000, status="active"
         )
 
     logger.info("Calling pre-upgrade-check")
-    action = await ops_test.model.applications[APP_NAME].units[0].run_action("pre-upgrade-check")
-    await action.wait()
+    action = juju.ext.model.applications[APP_NAME].units[0].run_action("pre-upgrade-check")
+    action.wait()
 
     # ensure action completes
     time.sleep(10)
 
     logger.info("Upgrading Connect...")
-    await ops_test.model.applications[APP_NAME].refresh(path=kafka_connect_charm)
-    await ops_test.model.wait_for_idle(
+    juju.ext.model.applications[APP_NAME].refresh(path=kafka_connect_charm)
+    juju.ext.model.wait_for_idle(
         apps=[APP_NAME],
         status="active",
         timeout=1000,
         idle_period=120,
     )
 
-    await check_connect_endpoints_status(ops_test, app_name=APP_NAME, port=DEFAULT_API_PORT)
+    check_connect_endpoints_status(juju, app_name=APP_NAME, port=DEFAULT_API_PORT)

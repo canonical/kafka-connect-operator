@@ -2,14 +2,13 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
 import json
 import logging
 import re
 import socket
 import ssl
 import tempfile
-from contextlib import asynccontextmanager, closing
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import PIPE, check_output
@@ -22,8 +21,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.x509 import Certificate, load_pem_x509_certificate
 from cryptography.x509.extensions import SubjectAlternativeName
 from cryptography.x509.oid import ExtensionOID
-from ops.model import Unit
-from pytest_operator.plugin import OpsTest
+from jubilant_adapters import JujuFixture, gather
+from jubilant_adapters.adapters import UnitAdapter
 from requests.auth import HTTPBasicAuth
 
 from core.models import PeerWorkersContext
@@ -76,18 +75,18 @@ def determine_kafka_channel(kafka_version: int) -> str:
     return KAFKA_3_CHANNEL if kafka_version == 3 else KAFKA_4_CHANNEL
 
 
-async def deploy_kafka(ops_test: OpsTest, kafka_version: int):
+async def deploy_kafka(juju: JujuFixture, kafka_version: int):
     """Deploy the Kafka app to use in the tests."""
     # deploy kafka
     if kafka_version == 3:
-        await asyncio.gather(
-            ops_test.model.deploy(
+        gather(
+            juju.ext.model.deploy(
                 ZOOKEEPER_APP,
                 channel=ZOOKEEPER_CHANNEL,
                 application_name=ZOOKEEPER_APP,
                 num_units=1,
             ),
-            ops_test.model.deploy(
+            juju.ext.model.deploy(
                 KAFKA_APP,
                 channel=determine_kafka_channel(kafka_version=kafka_version),
                 application_name=KAFKA_APP,
@@ -95,17 +94,17 @@ async def deploy_kafka(ops_test: OpsTest, kafka_version: int):
             ),
         )
 
-        await ops_test.model.wait_for_idle(apps=[ZOOKEEPER_APP, KAFKA_APP], timeout=3000)
+        juju.ext.model.wait_for_idle(apps=[ZOOKEEPER_APP, KAFKA_APP], timeout=3000)
 
-        assert ops_test.model.applications[KAFKA_APP].status == "blocked"
-        assert ops_test.model.applications[ZOOKEEPER_APP].status == "active"
+        assert juju.ext.model.applications[KAFKA_APP].status == "blocked"
+        assert juju.ext.model.applications[ZOOKEEPER_APP].status == "active"
 
-        await ops_test.model.add_relation(KAFKA_APP, ZOOKEEPER_APP)
-        await ops_test.model.wait_for_idle(
+        juju.ext.model.add_relation(KAFKA_APP, ZOOKEEPER_APP)
+        juju.ext.model.wait_for_idle(
             apps=[KAFKA_APP, ZOOKEEPER_APP], status="active", timeout=1000, idle_period=30
         )
     elif kafka_version == 4:
-        await ops_test.model.deploy(
+        juju.ext.model.deploy(
             KAFKA_APP,
             channel=KAFKA_4_CHANNEL,
             application_name=KAFKA_APP,
@@ -113,7 +112,7 @@ async def deploy_kafka(ops_test: OpsTest, kafka_version: int):
             config={"roles": "broker,controller"},
         )
 
-        await ops_test.model.wait_for_idle(
+        juju.ext.model.wait_for_idle(
             apps=[KAFKA_APP], status="active", timeout=1200, idle_period=30
         )
 
@@ -127,19 +126,19 @@ def check_socket(host: str | None, port: int) -> bool:
         return sock.connect_ex((host, port)) == 0
 
 
-async def run_command_on_unit(
-    ops_test: OpsTest, unit: Unit, command: str | list[str]
+def run_command_on_unit(
+    juju: JujuFixture, unit: UnitAdapter, command: str | list[str]
 ) -> CommandResult:
     """Runs a command on a given unit and returns the result."""
     command_args = command.split() if isinstance(command, str) else command
-    return_code, stdout, stderr = await ops_test.juju("ssh", f"{unit.name}", *command_args)
+    return_code, stdout, stderr = juju.juju("ssh", f"{unit.name}", *command_args)
 
     return CommandResult(return_code=return_code, stdout=stdout, stderr=stderr)
 
 
-async def get_unit_ipv4_address(ops_test: OpsTest, unit: Unit) -> str | None:
+def get_unit_ipv4_address(juju: JujuFixture, unit: UnitAdapter) -> str | None:
     """A safer alternative for `juju.unit.get_public_address()` which is robust to network changes."""
-    _, stdout, _ = await ops_test.juju("ssh", f"{unit.name}", "hostname -i")
+    _, stdout, _ = juju.juju("ssh", f"{unit.name}", "hostname -i")
     ipv4_matches = re.findall(r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}", stdout)
 
     if ipv4_matches:
@@ -148,15 +147,15 @@ async def get_unit_ipv4_address(ops_test: OpsTest, unit: Unit) -> str | None:
     return None
 
 
-async def check_connect_endpoints_status(
-    ops_test: OpsTest, app_name: str = APP_NAME, port: int = DEFAULT_API_PORT, verbose: bool = True
-) -> dict[Unit, bool]:
+def check_connect_endpoints_status(
+    juju: JujuFixture, app_name: str = APP_NAME, port: int = DEFAULT_API_PORT, verbose: bool = True
+) -> dict[UnitAdapter, bool]:
     """Returns a dict of unit: status mapping where status is True if endpoint is up and False otherwise."""
     status = {}
-    units = ops_test.model.applications[app_name].units
+    units = juju.ext.model.applications[app_name].units
 
     for unit in units:
-        ipv4_address = await get_unit_ipv4_address(ops_test, unit)
+        ipv4_address = get_unit_ipv4_address(juju, unit)
         status[unit] = check_socket(ipv4_address, port)
 
     if verbose:
@@ -165,9 +164,9 @@ async def check_connect_endpoints_status(
     return status
 
 
-async def get_admin_password(ops_test: OpsTest, unit: Unit) -> str:
+def get_admin_password(juju: JujuFixture, unit: UnitAdapter) -> str:
     """Get admin user's password of a unit by reading credentials file."""
-    res = await run_command_on_unit(ops_test, unit, f"sudo cat {PASSWORDS_PATH}")
+    res = run_command_on_unit(juju, unit, f"sudo cat {PASSWORDS_PATH}")
     raw = res.stdout.strip().split("\n")
 
     if not raw:
@@ -180,9 +179,9 @@ async def get_admin_password(ops_test: OpsTest, unit: Unit) -> str:
     raise Exception(f"Admin user not defined in the credentials file on unit {unit.name}.")
 
 
-async def make_api_request(
-    ops_test: OpsTest,
-    unit: Unit | None = None,
+def make_api_request(
+    juju: JujuFixture,
+    unit: UnitAdapter | None = None,
     method: str = "GET",
     endpoint: str = "",
     proto: str = "http",
@@ -195,8 +194,8 @@ async def make_api_request(
     """Makes a request to a REST Endpoint and returns the response.
 
     Args:
-        ops_test (OpsTest): OpsTest object
-        unit (Unit, optional): Unit used to make the request; if not supplied, uses the first unit in the Kafka Connect application `APP_NAME`.
+        juju (OpsTest): OpsTest object
+        unit (UnitAdapter, optional): Unit used to make the request; if not supplied, uses the first unit in the Kafka Connect application `APP_NAME`.
         method (str, optional): Request method. Defaults to "GET".
         endpoint (str, optional): API endpoint. Defaults to "".
         proto (str, optional): HTTP Protocol: "http" or "https". Defaults to "http".
@@ -209,14 +208,14 @@ async def make_api_request(
     Returns:
         requests.Response: Response object.
     """
-    target_unit = ops_test.model.applications[APP_NAME].units[0] if unit is None else unit
+    target_unit = juju.ext.model.applications[APP_NAME].units[0] if unit is None else unit
 
-    unit_ip = await get_unit_ipv4_address(ops_test, target_unit)
+    unit_ip = get_unit_ipv4_address(juju, target_unit)
     url = f"{proto}://{unit_ip}:{port}/{endpoint}"
 
     auth = None
     if auth_enabled:
-        admin_password = await get_admin_password(ops_test, unit=target_unit)
+        admin_password = get_admin_password(juju, unit=target_unit)
         auth = (
             HTTPBasicAuth(PeerWorkersContext.ADMIN_USERNAME, admin_password)
             if not custom_auth
@@ -265,10 +264,10 @@ def build_mysql_db_init_queries(
     return [query for query in queries if query]
 
 
-def search_secrets(ops_test: OpsTest, owner: str, search_key: str) -> str:
+def search_secrets(juju: JujuFixture, owner: str, search_key: str) -> str:
     """Searches secrets for a provided `search_key` and returns it if found, otherwise return empty string."""
     secrets_meta_raw = check_output(
-        f"JUJU_MODEL={ops_test.model_full_name} juju list-secrets --format json",
+        f"JUJU_MODEL={juju.ext.model_full_name} juju list-secrets --format json",
         stderr=PIPE,
         shell=True,
         universal_newlines=True,
@@ -280,7 +279,7 @@ def search_secrets(ops_test: OpsTest, owner: str, search_key: str) -> str:
             continue
 
         secrets_data_raw = check_output(
-            f"JUJU_MODEL={ops_test.model_full_name} juju show-secret --format json --reveal {secret_id}",
+            f"JUJU_MODEL={juju.ext.model_full_name} juju show-secret --format json --reveal {secret_id}",
             stderr=PIPE,
             shell=True,
             universal_newlines=True,
@@ -293,21 +292,21 @@ def search_secrets(ops_test: OpsTest, owner: str, search_key: str) -> str:
     return ""
 
 
-async def get_certificate(
-    ops_test: OpsTest, unit: Unit | None = None, port: int = DEFAULT_API_PORT
+def get_certificate(
+    juju: JujuFixture, unit: UnitAdapter | None = None, port: int = DEFAULT_API_PORT
 ) -> Certificate:
     """Gets TLS certificate of a particular unit using a socket.
 
     Args:
-        ops_test (OpsTest): OpsTest object
+        juju (OpsTest): OpsTest object
         unit (Unit | None, optional): Unit used to establish the socket; if not supplied, uses the first unit in the Kafka Connect application `APP_NAME`.
         port (int, optional): Socket port. Defaults to DEFAULT_API_PORT.
 
     Returns:
         Certificate: Unit's certificate used on the socket.
     """
-    target_unit = ops_test.model.applications[APP_NAME].units[0] if unit is None else unit
-    unit_ip = await get_unit_ipv4_address(ops_test, target_unit)
+    target_unit = juju.ext.model.applications[APP_NAME].units[0] if unit is None else unit
+    unit_ip = get_unit_ipv4_address(juju, target_unit)
 
     pem = ssl.get_server_certificate((f"{unit_ip}", port))
     return load_pem_x509_certificate(str.encode(pem), default_backend())
@@ -320,13 +319,13 @@ def extract_sans(cert: Certificate) -> list[str]:
     return val.get_values_for_type(x509.DNSName)
 
 
-@asynccontextmanager
-async def self_signed_ca(ops_test: OpsTest, app_name: str):
+@contextmanager
+def self_signed_ca(juju: JujuFixture, app_name: str):
     """Returns a context manager with self-signed-certificates operator CA file."""
     action_name: str = "get-ca-certificate"
-    unit = ops_test.model.applications[app_name].units[0]
-    action = await unit.run_action(action_name=action_name)
-    result = await action.wait()
+    unit = juju.ext.model.applications[app_name].units[0]
+    action = unit.run_action(action_name=action_name)
+    result = action.wait()
     ca = result.results.get("ca-certificate")
 
     with tempfile.NamedTemporaryFile(mode="w", delete_on_close=False) as ca_file:
@@ -335,17 +334,17 @@ async def self_signed_ca(ops_test: OpsTest, app_name: str):
         yield ca_file
 
 
-async def assert_connector_statuses(ops_test: OpsTest, **kwargs: int):
+def assert_connector_statuses(juju: JujuFixture, **kwargs: int):
     """Asserts the count of connectors in provided statuses via keyword arguments.
 
     Sample usage:
         1) Assert 1 connector is in RUNNING state
-        `await assert_connector_statuses(ops_test, running=1)`
+        `assert_connector_statuses(juju, running=1)`
 
         2) Assert 0 connector is RUNNING, 1 is PAUSED and 1 is STOPPED.
-        `await assert_connector_statuses(ops_test, running=0, paused=1, stopped=1)`
+        `assert_connector_statuses(juju, running=0, paused=1, stopped=1)`
     """
-    resp = await make_api_request(ops_test, endpoint="/connectors?expand=status")
+    resp = make_api_request(juju, endpoint="/connectors?expand=status")
 
     connector_states = [i["status"]["connector"]["state"] for i in resp.json().values()]
 
@@ -356,16 +355,16 @@ async def assert_connector_statuses(ops_test: OpsTest, **kwargs: int):
             assert len([i for i in connector_states if i == state]) == count
 
 
-async def destroy_active_workers(ops_test: OpsTest):
+def destroy_active_workers(juju: JujuFixture):
     """Finds unit(s) with active connector task(s) and destroys it(them)."""
-    status_resp = await make_connect_api_request(ops_test, endpoint="connectors?expand=status")
+    status_resp = make_connect_api_request(juju, endpoint="connectors?expand=status")
 
     workers = {
         item["status"]["connector"]["worker_id"].split(":")[0]
         for item in status_resp.json().values()
     }
 
-    for unit in ops_test.model.applications[APP_NAME].units:
-        if await get_unit_ipv4_address(ops_test, unit) in workers:
+    for unit in juju.ext.model.applications[APP_NAME].units:
+        if get_unit_ipv4_address(juju, unit) in workers:
             logger.info(f"Destroying {unit}")
-            await ops_test.model.applications[APP_NAME].destroy_units(unit.name)
+            juju.ext.model.applications[APP_NAME].destroy_units(unit.name)
