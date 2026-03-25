@@ -9,14 +9,6 @@ on:
       - fix-release
 
 jobs:
-  tag:
-    name: Create charm refresh compatibility version git tag
-    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v32.2.2
-    with:
-      track: '4'
-    permissions:
-      contents: write # Needed to create git tag
-
   ci-tests:
     needs:
       - tag
