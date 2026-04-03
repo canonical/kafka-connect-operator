@@ -44,11 +44,10 @@ jobs:
 
   build:
     name: Build charms
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v48
     with:
-      charmcraft-snap-channel: latest/candidate  # TODO: remove after charmcraft 3.3 stable release
+      charmcraft-snap-channel: latest/stable
       path-to-charm-directory: ${{ matrix.path }}
-      cache: false  # TODO: fix after being added to ccc
     strategy:
       matrix:
         path:
