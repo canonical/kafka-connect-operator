@@ -75,7 +75,7 @@ jobs:
       - lint
       - unit-test
       - build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, AMD64, X64, large, noble]
     timeout-minutes: 240
     steps:
       - name: Checkout
