@@ -20,7 +20,6 @@ jobs:
   release:
     name: Release charm
     needs:
-      - tag
       - ci-tests
     uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@29.3.0-rc.1
     with:
