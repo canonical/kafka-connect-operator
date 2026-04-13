@@ -46,6 +46,7 @@ jobs:
     name: Build charms
     uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v48
     with:
+      cache: false
       charmcraft-snap-channel: latest/stable
       path-to-charm-directory: ${{ matrix.path }}
     strategy:
