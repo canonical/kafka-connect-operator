@@ -10,12 +10,12 @@ from helpers import (
     JDBC_SINK_CONNECTOR_CLASS,
     JDBC_SOURCE_CONNECTOR_CLASS,
     KAFKA_APP,
-    KAFKA_CHANNEL,
     MYSQL_APP,
     MYSQL_CHANNEL,
     S3_CONNECTOR_CLASS,
     S3_CONNECTOR_LINK,
     build_mysql_db_init_queries,
+    deploy_kafka,
     download_file,
     get_unit_ipv4_address,
     make_connect_api_request,
@@ -35,7 +35,7 @@ TEST_TASK_NAME = "test_task"
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
+async def test_build_and_deploy(ops_test: OpsTest, kafka_version: int, kafka_connect_charm):
     """Deploys kafka-connect charm along kafka (in KRaft mode) & MySQL."""
     await asyncio.gather(
         ops_test.model.deploy(
@@ -43,17 +43,10 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
             application_name=APP_NAME,
             resources={PLUGIN_RESOURCE_KEY: "./tests/integration/resources/FakeResource.tar"},
             num_units=1,
-            series="jammy",
+            series="noble",
             config={"profile": "testing"},
         ),
-        ops_test.model.deploy(
-            KAFKA_APP,
-            channel=KAFKA_CHANNEL,
-            application_name=KAFKA_APP,
-            num_units=1,
-            series="jammy",
-            config={"roles": "broker,controller"},
-        ),
+        deploy_kafka(ops_test, kafka_version),
         ops_test.model.deploy(
             MYSQL_APP,
             channel=MYSQL_CHANNEL,

@@ -5,7 +5,7 @@ import pytest
 from helpers import (
     APP_NAME,
     KAFKA_APP,
-    KAFKA_CHANNEL,
+    deploy_kafka,
     extract_sans,
     get_certificate,
     make_connect_api_request,
@@ -26,7 +26,7 @@ TLS_CONFIG = {"ca-common-name": "kafka"}
 
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_deploy_tls(ops_test: OpsTest, kafka_connect_charm):
+async def test_deploy_tls(ops_test: OpsTest, kafka_version: int, kafka_connect_charm):
 
     await asyncio.gather(
         ops_test.model.deploy(
@@ -37,17 +37,10 @@ async def test_deploy_tls(ops_test: OpsTest, kafka_connect_charm):
         ops_test.model.deploy(
             kafka_connect_charm,
             application_name=APP_NAME,
-            series="jammy",
+            series="noble",
             config={"profile": "testing"},
         ),
-        ops_test.model.deploy(
-            KAFKA_APP,
-            channel=KAFKA_CHANNEL,
-            application_name=KAFKA_APP,
-            num_units=1,
-            series="jammy",
-            config={"roles": "broker,controller"},
-        ),
+        deploy_kafka(ops_test, kafka_version),
     )
 
     await ops_test.model.add_relation(APP_NAME, KAFKA_APP)

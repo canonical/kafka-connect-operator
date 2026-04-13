@@ -2,6 +2,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import asyncio
 import json
 import logging
 import re
@@ -35,11 +36,14 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 PASSWORDS_PATH = f"{CONFIG_DIR}/connect.password"
 KAFKA_APP = "kafka"
-KAFKA_CHANNEL = "3/edge"
+KAFKA_3_CHANNEL = "3/stable"
+KAFKA_4_CHANNEL = "4/edge"
 MYSQL_APP = "mysql"
 MYSQL_CHANNEL = "8.0/stable"
 POSTGRES_APP = "postgresql"
 POSTGRES_CHANNEL = "14/stable"
+ZOOKEEPER_APP = "zookeeper"
+ZOOKEEPER_CHANNEL = "3/stable"
 
 
 JDBC_CONNECTOR_DOWNLOAD_LINK = "https://github.com/Aiven-Open/jdbc-connector-for-apache-kafka/releases/download/v6.10.0/jdbc-connector-for-apache-kafka-6.10.0.tar"
@@ -65,6 +69,53 @@ class DatabaseFixtureParams:
     db_name: str
     no_tables: int = 1
     no_records: int = 1000
+
+
+def determine_kafka_channel(kafka_version: int) -> str:
+    """Determine Kafka charm channel to use."""
+    return KAFKA_3_CHANNEL if kafka_version == 3 else KAFKA_4_CHANNEL
+
+
+async def deploy_kafka(ops_test: OpsTest, kafka_version: int):
+    """Deploy the Kafka app to use in the tests."""
+    # deploy kafka
+    if kafka_version == 3:
+        await asyncio.gather(
+            ops_test.model.deploy(
+                ZOOKEEPER_APP,
+                channel=ZOOKEEPER_CHANNEL,
+                application_name=ZOOKEEPER_APP,
+                num_units=1,
+            ),
+            ops_test.model.deploy(
+                KAFKA_APP,
+                channel=determine_kafka_channel(kafka_version=kafka_version),
+                application_name=KAFKA_APP,
+                num_units=1,
+            ),
+        )
+
+        await ops_test.model.wait_for_idle(apps=[ZOOKEEPER_APP, KAFKA_APP], timeout=3000)
+
+        assert ops_test.model.applications[KAFKA_APP].status == "blocked"
+        assert ops_test.model.applications[ZOOKEEPER_APP].status == "active"
+
+        await ops_test.model.add_relation(KAFKA_APP, ZOOKEEPER_APP)
+        await ops_test.model.wait_for_idle(
+            apps=[KAFKA_APP, ZOOKEEPER_APP], status="active", timeout=1000, idle_period=30
+        )
+    elif kafka_version == 4:
+        await ops_test.model.deploy(
+            KAFKA_APP,
+            channel=KAFKA_4_CHANNEL,
+            application_name=KAFKA_APP,
+            num_units=1,
+            config={"roles": "broker,controller"},
+        )
+
+        await ops_test.model.wait_for_idle(
+            apps=[KAFKA_APP], status="active", timeout=1200, idle_period=30
+        )
 
 
 def check_socket(host: str | None, port: int) -> bool:
