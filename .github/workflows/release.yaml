@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - main
-      - fix-release
 
 jobs:
   ci-tests:
@@ -23,10 +22,11 @@ jobs:
       - ci-tests
     uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@29.3.0-rc.1
     with:
-      track: ${{ needs.tag.outputs.track }}
+      channel: '4/edge'
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
       path-to-file-resource: ./empty.tar
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
     permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
       contents: write  # Needed to create git tags
