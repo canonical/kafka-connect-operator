@@ -774,14 +774,14 @@ PyYAML = "==6.*"
 
 [[package]]
 name = "jubilant-adapters"
-version = "0.2.0"
+version = "0.2.1"
 description = "Adapters for Jubilant Charm Testing Library"
 optional = false
 python-versions = ">=3.10"
 groups = ["integration"]
 files = [
-    {file = "jubilant_adapters-0.2.0-py3-none-any.whl", hash = "sha256:7f8ca17595bce525909cedcc915cf4e55673ccc7b3d7c0c869af1dc08deec56b"},
-    {file = "jubilant_adapters-0.2.0.tar.gz", hash = "sha256:4f3e528a3db7547054c50e64d36c5ce8d7b72bb93a1f458c1d34f3f04bdf1b16"},
+    {file = "jubilant_adapters-0.2.1-py3-none-any.whl", hash = "sha256:62726f9b3dd0e0a1f9dd7b5b697cc252f34e5b913a5a572ea560fa2ce16943cf"},
+    {file = "jubilant_adapters-0.2.1.tar.gz", hash = "sha256:5761494ad4253b9a26eccc7b4a18f1664678ec0c62bdf6e950c774096ae3cb53"},
 ]
 
 [package.dependencies]

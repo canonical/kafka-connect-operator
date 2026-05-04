@@ -1,5 +1,4 @@
 import logging
-import tempfile
 from time import sleep
 
 from helpers import (
@@ -59,15 +58,14 @@ def test_build_and_deploy(juju: JujuFixture, kafka_version: int, kafka_connect_c
         )
 
 
-def test_add_plugin(juju: JujuFixture):
+def test_add_plugin(juju: JujuFixture, tmp_path):
     """Checks attach-resource functionality using Aiven JDBC connector and ensures JDBC source/sink connector plugins are added."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        plugin_path = f"{temp_dir}/jdbc-plugin.tar"
-        logging.info(f"Downloading JDBC connectors from {JDBC_CONNECTOR_DOWNLOAD_LINK}...")
-        download_file(JDBC_CONNECTOR_DOWNLOAD_LINK, plugin_path)
-        logging.info("Download finished successfully.")
-        # attach resource
-        juju.cli("attach-resource", APP_NAME, f"{PLUGIN_RESOURCE_KEY}={plugin_path}")
+    plugin_path = f"{tmp_path.as_posix()}/jdbc-plugin.tar"
+    logging.info(f"Downloading JDBC connectors from {JDBC_CONNECTOR_DOWNLOAD_LINK}...")
+    download_file(JDBC_CONNECTOR_DOWNLOAD_LINK, plugin_path)
+    logging.info("Download finished successfully.")
+    # attach resource
+    juju.cli("attach-resource", APP_NAME, f"{PLUGIN_RESOURCE_KEY}={plugin_path}")
 
     with juju.ext.fast_forward(fast_interval="60s"):
         juju.ext.model.wait_for_idle(apps=[APP_NAME], idle_period=30, timeout=600)
@@ -157,15 +155,14 @@ def test_task_is_running(juju: JujuFixture):
     assert status_response.json().get("state") == "RUNNING"
 
 
-def test_add_another_plugin(juju: JujuFixture):
+def test_add_another_plugin(juju: JujuFixture, tmp_path):
     """Checks attaching new plugins work as expected, preserving the old ones."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        plugin_path = f"{temp_dir}/jdbc-plugin.tar"
-        logging.info(f"Downloading S3 connectors from {S3_CONNECTOR_LINK}...")
-        download_file(S3_CONNECTOR_LINK, plugin_path)
-        logging.info("Download finished successfully.")
-        # attach resource
-        juju.cli("attach-resource", APP_NAME, f"{PLUGIN_RESOURCE_KEY}={plugin_path}")
+    plugin_path = f"{tmp_path.as_posix()}/jdbc-plugin.tar"
+    logging.info(f"Downloading S3 connectors from {S3_CONNECTOR_LINK}...")
+    download_file(S3_CONNECTOR_LINK, plugin_path)
+    logging.info("Download finished successfully.")
+    # attach resource
+    juju.cli("attach-resource", APP_NAME, f"{PLUGIN_RESOURCE_KEY}={plugin_path}")
 
     with juju.ext.fast_forward(fast_interval="60s"):
         juju.ext.model.wait_for_idle(apps=[APP_NAME], idle_period=30, timeout=600)
