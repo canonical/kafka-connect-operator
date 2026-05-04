@@ -4,6 +4,7 @@
 
 
 import json
+import os
 import random
 import string
 from typing import cast
@@ -68,7 +69,7 @@ def switch_model(juju: JujuFixture):
 def kafka_connect_charm(juju: JujuFixture):
     """Build the application charm."""
     charm_path = "."
-    charm = juju.ext.build_charm(charm_path)
+    charm = juju.ext.build_charm(charm_path, use_cache=bool(os.environ.get("CI")))
     return charm
 
 
@@ -76,7 +77,7 @@ def kafka_connect_charm(juju: JujuFixture):
 def source_integrator_charm(juju: JujuFixture):
     """Build the source (MySQL) integrator charm."""
     charm_path = "./tests/integration/source-integrator-charm"
-    charm = juju.ext.build_charm(charm_path)
+    charm = juju.ext.build_charm(charm_path, use_cache=bool(os.environ.get("CI")))
     return charm
 
 
@@ -84,7 +85,7 @@ def source_integrator_charm(juju: JujuFixture):
 def sink_integrator_charm(juju: JujuFixture):
     """Build the sink (PostgreSQL) integrator charm."""
     charm_path = "./tests/integration/sink-integrator-charm"
-    charm = juju.ext.build_charm(charm_path)
+    charm = juju.ext.build_charm(charm_path, use_cache=bool(os.environ.get("CI")))
     return charm
 
 

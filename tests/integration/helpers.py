@@ -75,7 +75,7 @@ def determine_kafka_channel(kafka_version: int) -> str:
     return KAFKA_3_CHANNEL if kafka_version == 3 else KAFKA_4_CHANNEL
 
 
-async def deploy_kafka(juju: JujuFixture, kafka_version: int):
+def deploy_kafka(juju: JujuFixture, kafka_version: int):
     """Deploy the Kafka app to use in the tests."""
     # deploy kafka
     if kafka_version == 3:
