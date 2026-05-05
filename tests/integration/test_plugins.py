@@ -17,6 +17,7 @@ from helpers import (
     get_unit_ipv4_address,
     make_connect_api_request,
 )
+from jubilant import Juju
 from jubilant_adapters import JujuFixture, gather
 
 from literals import PLUGIN_RESOURCE_KEY
@@ -58,9 +59,9 @@ def test_build_and_deploy(juju: JujuFixture, kafka_version: int, kafka_connect_c
         )
 
 
-def test_add_plugin(juju: JujuFixture, tmp_path):
+def test_add_plugin(juju: JujuFixture):
     """Checks attach-resource functionality using Aiven JDBC connector and ensures JDBC source/sink connector plugins are added."""
-    plugin_path = f"{tmp_path.as_posix()}/jdbc-plugin.tar"
+    plugin_path = f"{Juju()._temp_dir}/jdbc-plugin.tar"
     logging.info(f"Downloading JDBC connectors from {JDBC_CONNECTOR_DOWNLOAD_LINK}...")
     download_file(JDBC_CONNECTOR_DOWNLOAD_LINK, plugin_path)
     logging.info("Download finished successfully.")
@@ -155,9 +156,9 @@ def test_task_is_running(juju: JujuFixture):
     assert status_response.json().get("state") == "RUNNING"
 
 
-def test_add_another_plugin(juju: JujuFixture, tmp_path):
+def test_add_another_plugin(juju: JujuFixture):
     """Checks attaching new plugins work as expected, preserving the old ones."""
-    plugin_path = f"{tmp_path.as_posix()}/jdbc-plugin.tar"
+    plugin_path = f"{Juju()._temp_dir}/jdbc-plugin.tar"
     logging.info(f"Downloading S3 connectors from {S3_CONNECTOR_LINK}...")
     download_file(S3_CONNECTOR_LINK, plugin_path)
     logging.info("Download finished successfully.")
