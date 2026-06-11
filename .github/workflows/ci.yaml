@@ -49,6 +49,9 @@ jobs:
       cache: false
       charmcraft-snap-channel: latest/stable
       path-to-charm-directory: ${{ matrix.path }}
+    permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
+      contents: read
     strategy:
       matrix:
         path:
