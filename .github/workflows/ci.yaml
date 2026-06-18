@@ -55,6 +55,9 @@ jobs:
           - .
           - tests/integration/source-integrator-charm/
           - tests/integration/sink-integrator-charm/
+    permissions:
+      actions: read
+      contents: read
 
   integration-test:
     strategy:
