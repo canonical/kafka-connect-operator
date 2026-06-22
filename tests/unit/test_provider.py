@@ -76,23 +76,28 @@ def test_provider_on_relation_changed(
     # Given
     relation_id = 7
     state_in = base_state
-    secret = Secret(
-        label=f"connect-client.{relation_id}.user.secret",
-        tracked_content=initial_data,
-    )
+    remote_unit_data = dict(initial_data)
+    secrets = []
+    if initial_data:
+        secret = Secret(
+            label=f"connect-client.{relation_id}.user.secret",
+            tracked_content=initial_data,
+        )
+        remote_unit_data["secret-user"] = secret.id
+        secrets = [secret]
     client_rel = Relation(
         CLIENT_REL,
         CLIENT_REL,
         id=relation_id,
         remote_app_data={"plugin-url": "http://10.10.10.10:8080"},
-        remote_units_data={0: {"secret-user": secret.id, **initial_data}},
+        remote_units_data={0: remote_unit_data},
     )
     peer_rel = PeerRelation(PEER_REL, PEER_REL)
     connect_manager_mock = MagicMock()
     auth_manager_mock = MagicMock()
 
     state_in = dataclasses.replace(
-        base_state, relations=[peer_rel, client_rel], leader=is_leader, secrets=[secret]
+        base_state, relations=[peer_rel, client_rel], leader=is_leader, secrets=secrets
     )
 
     # When
