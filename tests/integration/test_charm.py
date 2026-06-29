@@ -2,10 +2,8 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
 import logging
 
-import pytest
 from helpers import (
     APP_NAME,
     KAFKA_APP,
@@ -13,87 +11,76 @@ from helpers import (
     deploy_kafka,
     make_connect_api_request,
 )
-from pytest_operator.plugin import OpsTest
+from jubilant_adapters import JujuFixture, gather
 
 from literals import DEFAULT_API_PORT
 
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.abort_on_fail
-@pytest.mark.skip_if_deployed
-async def test_deploy_charms(ops_test: OpsTest, kafka_version: int, kafka_connect_charm):
+def test_deploy_charms(juju: JujuFixture, kafka_version: int, kafka_connect_charm):
     """Deploys kafka-connect charm along kafka (in KRaft mode)."""
     # deploy kafka & kafka-connect
-    await asyncio.gather(
-        ops_test.model.deploy(
+    gather(
+        juju.ext.model.deploy(
             kafka_connect_charm,
             application_name=APP_NAME,
             num_units=1,
             series="noble",
             config={"profile": "testing"},
         ),
-        deploy_kafka(ops_test, kafka_version),
+        deploy_kafka(juju, kafka_version),
     )
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP], timeout=3000)
+    juju.ext.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP], timeout=3000)
 
-    assert ops_test.model.applications[KAFKA_APP].status == "active"
-    assert ops_test.model.applications[APP_NAME].status == "blocked"
+    assert juju.ext.model.applications[KAFKA_APP].status == "active"
+    assert juju.ext.model.applications[APP_NAME].status == "blocked"
 
-    await ops_test.model.add_relation(APP_NAME, KAFKA_APP)
+    juju.ext.model.add_relation(APP_NAME, KAFKA_APP)
 
-    async with ops_test.fast_forward(fast_interval="60s"):
-        await ops_test.model.wait_for_idle(
-            apps=[APP_NAME, KAFKA_APP], idle_period=60, timeout=1000
-        )
+    with juju.ext.fast_forward(fast_interval="60s"):
+        juju.ext.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP], idle_period=60, timeout=1000)
 
-    assert ops_test.model.applications[APP_NAME].status == "active"
+    assert juju.ext.model.applications[APP_NAME].status == "active"
 
 
-@pytest.mark.abort_on_fail
-async def test_api_endpoint(ops_test: OpsTest):
+def test_api_endpoint(juju: JujuFixture):
     """Checks API endpoint connectivity using a socket."""
-    status = await check_connect_endpoints_status(
-        ops_test, app_name=APP_NAME, port=DEFAULT_API_PORT
-    )
+    status = check_connect_endpoints_status(juju, app_name=APP_NAME, port=DEFAULT_API_PORT)
 
     # assert all endpoints are up
     assert all(status.values())
 
 
-async def test_scale_out(ops_test: OpsTest):
+def test_scale_out(juju: JujuFixture):
     """Checks connect workers scaling functionality."""
-    await ops_test.model.applications[APP_NAME].add_units(count=2)
-    async with ops_test.fast_forward(fast_interval="60s"):
-        await ops_test.model.wait_for_idle(
+    juju.ext.model.applications[APP_NAME].add_units(count=2)
+    with juju.ext.fast_forward(fast_interval="60s"):
+        juju.ext.model.wait_for_idle(
             apps=[APP_NAME], idle_period=30, timeout=1200, status="active", wait_for_exact_units=3
         )
 
-    await check_connect_endpoints_status(ops_test, app_name=APP_NAME, port=DEFAULT_API_PORT)
+    check_connect_endpoints_status(juju, app_name=APP_NAME, port=DEFAULT_API_PORT)
 
 
-@pytest.mark.abort_on_fail
-async def test_auth(ops_test: OpsTest):
+def test_auth(juju: JujuFixture):
     """Checks authentication is enabled on all API endpoints."""
-    for unit in ops_test.model.applications[APP_NAME].units:
-        response = await make_connect_api_request(ops_test, unit=unit, auth_enabled=False)
+    for unit in juju.ext.model.applications[APP_NAME].units:
+        response = make_connect_api_request(juju, unit=unit, auth_enabled=False)
         assert response.status_code == 401
 
-        response = await make_connect_api_request(ops_test, unit=unit, auth_enabled=True)
+        response = make_connect_api_request(juju, unit=unit, auth_enabled=True)
         assert response.status_code == 200
 
 
-@pytest.mark.abort_on_fail
-async def test_broken_kafka_relation(ops_test: OpsTest):
+def test_broken_kafka_relation(juju: JujuFixture):
 
-    await ops_test.juju("remove-relation", APP_NAME, KAFKA_APP)
-    await ops_test.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP], timeout=1000, idle_period=30)
+    juju.juju("remove-relation", APP_NAME, KAFKA_APP)
+    juju.ext.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP], timeout=1000, idle_period=30)
 
-    status = await check_connect_endpoints_status(
-        ops_test, app_name=APP_NAME, port=DEFAULT_API_PORT
-    )
+    status = check_connect_endpoints_status(juju, app_name=APP_NAME, port=DEFAULT_API_PORT)
 
-    assert ops_test.model.applications[APP_NAME].status == "blocked"
+    assert juju.ext.model.applications[APP_NAME].status == "blocked"
     # assert all endpoints are down
     assert not any(status.values())
