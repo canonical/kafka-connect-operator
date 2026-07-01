@@ -131,6 +131,9 @@ jobs:
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --kafka ${{ matrix.kafka-version }}
+        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --keep-models --kafka ${{ matrix.kafka-version }}
         env:
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
+      - name: Juju debug logs
+        if: ${{ always() }}
+        run: juju debug-log --color --replay --no-tail
