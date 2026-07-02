@@ -110,11 +110,11 @@ class TLSManager:
 
     def set_chain(self) -> None:
         """Sets the unit chain."""
-        if not self.tls_context.chain:
+        if not self.tls_context.bundle:
             logger.error("Can't set chain to unit, missing chain in relation data")
             return
 
-        for i, chain_cert in enumerate(self.tls_context.chain):
+        for i, chain_cert in enumerate(self.tls_context.bundle):
             self.workload.write(
                 content=chain_cert, path=f"{self.workload.paths.config_dir}/bundle{i}.pem"
             )
@@ -150,7 +150,11 @@ class TLSManager:
 
         command = f"{self.keytool} -import -v -alias {alias} -file {filename} -keystore {self.workload.paths.truststore} -storepass {self.tls_context.truststore_password} -noprompt"
         try:
-            self.workload.exec(command=command.split(), working_dir=self.workload.paths.config_dir)
+            self.workload.exec(
+                command=command.split(),
+                working_dir=self.workload.paths.config_dir,
+                log_on_error=False,
+            )
         except (subprocess.CalledProcessError, ExecError) as e:
             # in case this reruns and fails
             if e.stdout and "already exists" in e.stdout:
