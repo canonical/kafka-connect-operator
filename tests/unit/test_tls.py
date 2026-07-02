@@ -260,6 +260,7 @@ def test_sans_change_leads_to_new_cert_request(
         local_app_data={"tls": "enabled"},
         local_unit_data={
             TLSContext.CERT: tls_artifacts.cert.decode("utf-8"),
+            TLSContext.CA: tls_artifacts.ca.decode("utf-8"),
             TLSContext.PRIVATE_KEY: tls_artifacts.private_key.decode("utf-8"),
             TLSContext.CSR: "old-csr",
             "private-address": "10.10.10.10",

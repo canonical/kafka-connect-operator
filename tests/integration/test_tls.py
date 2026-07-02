@@ -10,6 +10,7 @@ from helpers import (
     make_connect_api_request,
     run_command_on_unit,
     self_signed_ca,
+    sign_manual_certs,
 )
 from jubilant_adapters import JujuFixture, gather
 from requests.exceptions import ConnectionError, SSLError
@@ -21,6 +22,8 @@ logger = logging.getLogger(__name__)
 TLS_APP = "self-signed-certificates"
 TLS_CHANNEL = "1/stable"
 TLS_CONFIG = {"ca-common-name": "kafka"}
+MANUAL_TLS_NAME = "manual-tls-certificates"
+MANUAL_TLS_CHANNEL = "1/stable"
 
 
 def test_deploy_tls(juju: JujuFixture, kafka_version: int, kafka_connect_charm):
@@ -104,3 +107,31 @@ def test_tls_broken(juju: JujuFixture):
         file_extensions = {f.split(".")[-1] for f in res.stdout.split() if f}
 
         assert not {"pem", "key", "p12", "jks"} & file_extensions
+
+
+def test_manual_tls_with_no_chain(juju: JujuFixture, tmp_path):
+    juju.ext.model.deploy(MANUAL_TLS_NAME, channel=MANUAL_TLS_CHANNEL)
+
+    juju.ext.model.add_relation(APP_NAME, MANUAL_TLS_NAME)
+
+    with juju.ext.fast_forward(fast_interval="60s"):
+        juju.ext.model.wait_for_idle(
+            apps=[APP_NAME, MANUAL_TLS_NAME],
+            idle_period=30,
+            timeout=1000,
+            raise_on_error=False,
+        )
+
+    ca_file = sign_manual_certs(tmp_path, juju.model)
+
+    juju.ext.model.wait_for_idle(
+        apps=[APP_NAME, MANUAL_TLS_NAME],
+        idle_period=30,
+        timeout=1000,
+        raise_on_error=False,
+        status="active",
+    )
+
+    for unit in juju.ext.model.applications[APP_NAME].units:
+        response = make_connect_api_request(juju, unit=unit, proto="https", verify=ca_file)
+        assert response.status_code == 200

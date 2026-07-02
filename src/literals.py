@@ -78,6 +78,7 @@ class Status(Enum):
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("Worker service is not running"), "WARNING")
     SERVICE_STARTING = StatusLevel(WaitingStatus("Worker is still starting up"), "INFO")
     SERVICE_UNHEALTHY = StatusLevel(BlockedStatus("Worker is unable to handle requests"), "ERROR")
+    NO_CERT = StatusLevel(WaitingStatus("unit waiting for signed certificates"), "INFO")
 
     ACTIVE = StatusLevel(ActiveStatus(), "DEBUG")
 

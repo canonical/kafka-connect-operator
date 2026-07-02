@@ -162,7 +162,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.connect.update_clients_data()
 
         # Check if SANs have changed.
-        if self.context.peer_workers.tls_enabled and self.tls_manager.sans_change_detected:
+        if self.context.tls_enabled and self.tls_manager.sans_change_detected:
             unit_tls_context = self.context.worker_unit.tls
             self.tls.certificates.on.certificate_expiring.emit(
                 certificate=unit_tls_context.certificate,
