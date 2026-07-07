@@ -279,7 +279,7 @@ class TLSContext(RelationContext):
     @property
     def bundle(self) -> list[str]:
         """The cert bundle used for TLS identity."""
-        if not all([self.certificate, self.ca, self.chain]):
+        if not all([self.certificate, self.ca]):
             return []
 
         # manual-tls-certificates is loaded with the signed cert, the intermediate CA that signed it
@@ -302,7 +302,7 @@ class TLSContext(RelationContext):
     @property
     @override
     def status(self) -> Status:
-        return Status.ACTIVE
+        return Status.ACTIVE if all([self.private_key, self.bundle]) else Status.NO_CERT
 
 
 class WorkerUnitContext(RelationContext):
@@ -535,10 +535,18 @@ class Context(WithStatus, Object):
         return cache
 
     @property
+    def tls_enabled(self) -> bool:
+        """Returns True if TLS is enabled and active."""
+        return self.peer_workers.tls_enabled and self.worker_unit.tls.ready
+
+    @property
     @override
     def status(self) -> Status:
         if not self.kafka_client.ready:
             return self.kafka_client.status
+
+        if self.peer_workers.tls_enabled:
+            return self.worker_unit.tls.status
 
         return Status.ACTIVE
 

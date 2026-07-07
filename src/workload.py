@@ -87,6 +87,7 @@ class Workload(WorkloadBase):
         env: Mapping[str, str] | None = None,
         working_dir: str | None = None,
         sensitive: bool = True,
+        log_on_error: bool = True,
     ) -> str:
         should_log = not sensitive or self.log_sensitive_output
         try:
@@ -102,7 +103,7 @@ class Workload(WorkloadBase):
                 logger.debug(f"{output=}")
             return output
         except subprocess.CalledProcessError as e:
-            if should_log:
+            if should_log and log_on_error:
                 logger.error(f"cmd failed - cmd={e.cmd}, stdout={e.stdout}, stderr={e.stderr}")
             raise e
 

@@ -147,6 +147,7 @@ class WorkloadBase(ABC):
         env: dict[str, str] | None = None,
         working_dir: str | None = None,
         sensitive: bool = False,
+        log_on_error: bool = True,
     ) -> str:
         """Runs a command on the workload substrate."""
         ...
