@@ -52,9 +52,22 @@ jobs:
     strategy:
       matrix:
         path:
-          - .
           - tests/integration/source-integrator-charm/
           - tests/integration/sink-integrator-charm/
+    permissions:
+      actions: read
+      contents: read
+
+  build-from-monorepo:
+    name: Build charms
+    uses: ./.github/workflows/_build_charm_dev.yaml
+    with:
+      monorepo-branch: feat/connect
+      path-to-charm-directory: ${{ matrix.path }}
+    strategy:
+      matrix:
+        path:
+          - connect_machine
     permissions:
       actions: read
       contents: read
@@ -85,6 +98,7 @@ jobs:
       - lint
       - unit-test
       - build
+      - build-from-monorepo
     runs-on: [self-hosted, linux, AMD64, X64, large, noble]
     timeout-minutes: 240
     steps:
@@ -107,6 +121,7 @@ jobs:
       - name: Select tests
         id: select-tests
         run: |
+          cp connect_machine/*.charm .
           if [ "${{ github.event_name }}" == "schedule" ]
           then
             echo Running unstable and stable tests
@@ -116,6 +131,9 @@ jobs:
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --kafka ${{ matrix.kafka-version }}
+        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --keep-models --kafka ${{ matrix.kafka-version }}
         env:
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
+      - name: Juju debug logs
+        if: ${{ always() }}
+        run: juju debug-log --color --replay --no-tail
