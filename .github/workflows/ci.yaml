@@ -62,7 +62,7 @@ jobs:
     name: Build charms
     uses: ./.github/workflows/_build_charm_dev.yaml
     with:
-      charmcraft-snap-channel: latest/stable
+      monorepo-branch: feat/connect
       path-to-charm-directory: ${{ matrix.path }}
     strategy:
       matrix:
